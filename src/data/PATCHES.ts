@@ -1,56 +1,90 @@
+import {ReportLanguage} from 'fflogs'
 import _ from 'lodash'
-// This is all right from /PatchList - should be easy to sync Eventually™
 
-export interface Patch {
-	date: number
+export enum GameEdition {
+	GLOBAL,
+	KOREAN,
+	CHINESE,
 }
 
+export function languageToEdition(lang: ReportLanguage): GameEdition {
+	switch (lang) {
+		case ReportLanguage.JAPANESE:
+		case ReportLanguage.ENGLISH:
+		case ReportLanguage.GERMAN:
+		case ReportLanguage.FRENCH:
+			return GameEdition.GLOBAL
+
+		case ReportLanguage.KOREAN:
+			return GameEdition.KOREAN
+
+		case ReportLanguage.CHINESE:
+			return GameEdition.CHINESE
+
+		// Fallback case for when fflogs borks
+		// TODO: This probably will crop up in other places. Look into solving it higher up the chain.
+		case ReportLanguage.UNKNOWN:
+		case undefined:
+			return GameEdition.GLOBAL
+	}
+
+	throw new Error(`Unknown report language "${lang}" received.`)
+}
+
+// Using global as a source of truth on the order of patch keys
+type PatchDates =
+	& Partial<Record<GameEdition, number>>
+	& {[GameEdition.GLOBAL]: number}
+
+interface PatchBranch {
+	baseUrl: string
+}
+
+export interface Patch {
+	date: PatchDates
+	branch?: PatchBranch
+}
+
+// This is all right from /PatchList - should be easy to sync Eventually™
+const FALLBACK_KEY = '✖'
 const PATCHES = {
 	// Not going to support pre-4.0 at all
-	'2.0 - 3.57': {
-		date: 0,
+	[FALLBACK_KEY]: {
+		date: {
+			[GameEdition.GLOBAL]: 0,
+			[GameEdition.KOREAN]: 0,
+			[GameEdition.CHINESE]: 0,
+		},
 	},
-	'4.0': {
-		date: 1497517200,
+	'Stormblood': {
+		date: {
+			[GameEdition.GLOBAL]: 1497517200,
+			[GameEdition.KOREAN]: 1513670400,
+			[GameEdition.CHINESE]: 1506412800,
+		},
+		branch: {
+			baseUrl: 'https://stormblood.xivanalysis.com',
+		},
 	},
-	'4.01': {
-		date: 1499162101,
+	'5.0': {
+		date: {
+			[GameEdition.GLOBAL]: 1561712400, // 28/06/19 09:00:00 GMT
+		},
 	},
-	'4.05': {
-		date: 1500368961,
+	'5.01': {
+		date: {
+			[GameEdition.GLOBAL]: 1563267600, // 16/07/19 09:00:00 GMT
+		},
 	},
-	'4.06': {
-		date: 1501747200,
+	'5.05': {
+		date: {
+			[GameEdition.GLOBAL]: 1564477200, // 30/07/19 09:00:00 GMT
+		},
 	},
-	'4.1': {
-		date: 1507622400,
-	},
-	'4.11': {
-		date: 1508839200,
-	},
-	'4.15': {
-		date: 1511258400,
-	},
-	'4.2': {
-		date: 1517227200,
-	},
-	'4.25': {
-		date: 1520935200,
-	},
-	'4.3': {
-		date: 1526976000,
-	},
-	'4.31': {
-		date: 1528223134,
-	},
-	'4.35': {
-		date: 1530617875,
-	},
-	'4.36': {
-		date: 1533635005,
-	},
-	'4.4': {
-		date: 1537268400,
+	'5.08': {
+		date: {
+			[GameEdition.GLOBAL]: 1567069200, // 29/08/19 09:00:00 GMT
+		},
 	},
 }
 
@@ -62,15 +96,26 @@ const patchData: PatchData = PATCHES
 
 // This is intentionally in newest->oldest order
 const sortedPatches = (Object.keys(patchData) as PatchNumber[]).sort(
-	(a, b) => patchData[b].date - patchData[a].date,
+	(a, b) => patchData[b].date[GameEdition.GLOBAL] - patchData[a].date[GameEdition.GLOBAL],
 )
 
-export function getPatch(timestamp = (new Date()).getTime()): PatchNumber {
-	const key = sortedPatches.find(key => patchData[key].date < timestamp)
-	return key!
+export function getPatch(edition: GameEdition, timestamp: number): PatchNumber {
+	const key = sortedPatches.find(key => (patchData[key].date[edition] || Infinity) < timestamp)
+	return key || FALLBACK_KEY
+}
+
+export function getPatchDate(edition: GameEdition, patch: PatchNumber) {
+	let date: number | undefined
+	for (const key of sortedPatches) {
+		const editionDate = patchData[key].date[edition]
+		if (editionDate) { date = editionDate }
+		if (key === patch) { break }
+	}
+	return date || Infinity
 }
 
 export function patchSupported(
+	edition: GameEdition,
 	from: PatchNumber,
 	to: PatchNumber,
 	at = (new Date()).getTime(),
@@ -78,10 +123,12 @@ export function patchSupported(
 	if (!from) { return false }
 
 	const nextPatchKey = sortedPatches[sortedPatches.indexOf(to) - 1]
-	const nextPatch = patchData[nextPatchKey] || {date: Infinity}
+	const nextPatch = patchData[nextPatchKey]
 
-	const fromDate = patchData[from].date
-	const toDate = nextPatch.date
+	const fromDate = getPatchDate(edition, from)
+	const toDate = nextPatch
+		? getPatchDate(edition, nextPatchKey)
+		: Infinity
 
 	return _.inRange(at, fromDate, toDate)
 }

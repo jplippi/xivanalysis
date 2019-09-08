@@ -1,22 +1,22 @@
+import {t} from '@lingui/macro'
+import {Trans, Plural} from '@lingui/react'
 import React from 'react'
-import {i18nMark, Trans, Plural} from '@lingui/react'
 import {Accordion} from 'semantic-ui-react'
 
 import Rotation from 'components/ui/Rotation'
-import {getAction} from 'data/ACTIONS'
+import NormalisedMessage from 'components/ui/NormalisedMessage'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import Module from 'parser/core/Module'
 import {TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
+import {matchClosestLower} from 'utilities'
 
 // BRD weaves, ninjustsu, etc. should be handled by subclasses w/ isBadWeave overrides
-const MAX_WEAVES = {
-	[undefined]: 2, // Default castTime is 0
+const DEFAULT_MAX_WEAVES = 2 // Default castTime is 0
+const MAX_WEAVE_TIERS = {
 	0: 2,
-	0.5: 2,
 	1: 1,
-	1.5: 1,
-	2: 1,
 	2.5: 0,
-	default: 0,
 }
 
 const WEAVING_SEVERITY = {
@@ -34,8 +34,7 @@ export default class Weaving extends Module {
 		'suggestions',
 	]
 
-	static i18n_id = i18nMark('core.weaving.title')
-	static title = 'Weaving Issues'
+	static title = t('core.weaving.title')`Weaving Issues`
 
 	_weaves = []
 	_ongoingCastEvent = null
@@ -55,10 +54,10 @@ export default class Weaving extends Module {
 	}
 
 	_onCast(event) {
-		const action = getAction(event.ability.guid)
+		const action = getDataBy(ACTIONS, 'id', event.ability.guid)
 
 		// If the action is an auto, just ignore it
-		if (action.autoAttack) {
+		if (!action || action.autoAttack) {
 			return
 		}
 
@@ -75,11 +74,13 @@ export default class Weaving extends Module {
 				// Override the timestamp of the GCD with when its cast began
 				timestamp: this._ongoingCastEvent.timestamp,
 			}
-			this._ongoingCastEvent = null
 		} else {
 			// This event was an instant GCD (or log missed the cast starting)
 			this._trailingGcdEvent = event
 		}
+
+		// Always reset the ongoing cast
+		this._ongoingCastEvent = null
 
 		// Throw the current state onto the history
 		this._saveIfBad()
@@ -101,7 +102,7 @@ export default class Weaving extends Module {
 			// WVR Focused synth lmao
 			icon: 'https://xivapi.com/i/001000/001785.png',
 			content: <Trans id="core.weaving.content">
-				Avoid weaving more actions than you have time for in a single GCD window. Doing so will delay your next GCD, reducing possible uptime. Check the <a href="javascript:void(0);" onClick={() => this.parser.scrollTo(this.constructor.handle)}>{this.constructor.title}</a> module below for more detailed analysis.
+				Avoid weaving more actions than you have time for in a single GCD window. Doing so will delay your next GCD, reducing possible uptime. Check the <a href="javascript:void(0);" onClick={() => this.parser.scrollTo(this.constructor.handle)}><NormalisedMessage message={this.constructor.title}/></a> module below for more detailed analysis.
 			</Trans>,
 			why: <Plural
 				id="core.weaving.why"
@@ -148,16 +149,15 @@ export default class Weaving extends Module {
 			event => !this.invuln.isUntargetable('all', event.timestamp)
 		).length
 
-		maxWeaves = undefined
-
 		// Just using maxWeaves to allow potential subclasses to utilise standard functionality with custom max
 		if (!maxWeaves) {
 			// If there's no leading ability, it's the first GCD. Allow the 'default' cast time's amount
 			if (!weave.leadingGcdEvent.ability) {
-				maxWeaves = MAX_WEAVES[undefined]
+				maxWeaves = DEFAULT_MAX_WEAVES
 			} else {
 				const castTime = this.castTime.forEvent(weave.leadingGcdEvent)
-				maxWeaves = MAX_WEAVES[castTime] || MAX_WEAVES.default
+				const closest = matchClosestLower(MAX_WEAVE_TIERS, castTime)
+				maxWeaves = closest !== undefined? closest : DEFAULT_MAX_WEAVES
 			}
 		}
 

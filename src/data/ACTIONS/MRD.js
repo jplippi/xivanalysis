@@ -1,3 +1,5 @@
+import STATUSES from 'data/STATUSES'
+
 // Split between MRD and WAR
 export default {
 	// -----
@@ -7,35 +9,10 @@ export default {
 		id: 31,
 		name: 'Heavy Swing',
 		icon: 'https://xivapi.com/i/000000/000260.png',
-		potency: 160,
+		potency: 200,
 		onGcd: true,
 		combo: {
 			start: true,
-		},
-	},
-
-	SKULL_SUNDER: {
-		id: 35,
-		name: 'Skull Sunder',
-		icon: 'https://xivapi.com/i/000000/000257.png',
-		onGcd: true,
-		potency: 100,
-		combo: {
-			from: 31,
-			potency: 210,
-		},
-	},
-
-	BUTCHERS_BLOCK: {
-		id: 47,
-		name: 'Butcher\'s Block',
-		icon: 'https://xivapi.com/i/000000/000262.png',
-		onGcd: true,
-		potency: 100,
-		combo: {
-			from: 35,
-			potency: 300,
-			end: true,
 		},
 	},
 
@@ -65,7 +42,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 31,
-			potency: 200,
+			potency: 300,
 		},
 	},
 
@@ -77,7 +54,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 37,
-			potency: 280,
+			potency: 380,
 			end: true,
 		},
 	},
@@ -90,7 +67,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 37,
-			potency: 280,
+			potency: 380,
 			end: true,
 		},
 	},
@@ -103,16 +80,18 @@ export default {
 		id: 40,
 		name: 'Thrill of Battle',
 		icon: 'https://xivapi.com/i/000000/000263.png',
-		cooldown: 120,
+		cooldown: 90,
 		onGcd: false,
+		statusesApplied: [STATUSES.THRILL_OF_BATTLE],
 	},
 
 	HOLMGANG: {
 		id: 43,
 		name: 'Holmgang',
 		icon: 'https://xivapi.com/i/000000/000266.png',
-		cooldown: 180,
+		cooldown: 240,
 		onGcd: false,
+		statusesApplied: [STATUSES.HOLMGANG],
 	},
 
 	VENGEANCE: {
@@ -121,5 +100,6 @@ export default {
 		icon: 'https://xivapi.com/i/000000/000267.png',
 		cooldown: 120,
 		onGcd: false,
+		statusesApplied: [STATUSES.VENGEANCE],
 	},
 }

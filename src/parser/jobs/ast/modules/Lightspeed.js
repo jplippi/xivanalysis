@@ -1,27 +1,23 @@
-import {Trans, i18nMark} from '@lingui/react'
-import React, {Fragment} from 'react'
-import {Accordion} from 'semantic-ui-react'
-
+import {t} from '@lingui/macro'
+import {Plural, Trans} from '@lingui/react'
 import {ActionLink} from 'components/ui/DbLink'
 import Rotation from 'components/ui/Rotation'
-import ACTIONS, {getAction} from 'data/ACTIONS'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
-// import {Suggestion, TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
-
+import React, {Fragment} from 'react'
+import {Accordion} from 'semantic-ui-react'
 import DISPLAY_ORDER from './DISPLAY_ORDER'
 
 const LIGHTSPEED_CAST_TIME_MOD = -2.5
-// const LIGHTSPEED_LENGTH = 10000
 
 export default class LIGHTSPEED extends Module {
 	static handle = 'lightspeed'
-	static i18n_id = i18nMark('ast.lightspeed.title')
 	static dependencies = [
 		'castTime',
-		// 'suggestions',
 	]
-	static title = 'Lightspeed'
+	static title = t('ast.lightspeed.title')`Lightspeed`
 	static displayOrder = DISPLAY_ORDER.LIGHTSPEED
 
 	_active = false
@@ -42,9 +38,7 @@ export default class LIGHTSPEED extends Module {
 			abilityId: STATUSES.LIGHTSPEED.id,
 		}
 		this.addHook('applybuff', lsBuffFilter, this._onApplyLightspeed)
-		this.addHook('refreshbuff', lsBuffFilter, this._onRefreshLightspeed)
 		this.addHook('removebuff', lsBuffFilter, this._onRemoveLightspeed)
-
 		this.addHook('complete', this._onComplete)
 	}
 
@@ -57,7 +51,8 @@ export default class LIGHTSPEED extends Module {
 		}
 
 		// Only going to save casts during LIGHTSPEED
-		if (!this._active || getAction(actionId).autoAttack) {
+		const action = getDataBy(ACTIONS, 'id', actionId)
+		if (!this._active || !action || action.autoAttack) {
 			return
 		}
 
@@ -69,11 +64,6 @@ export default class LIGHTSPEED extends Module {
 		// If we're not active at this point, they started the fight with LIGHTSPEED up. Clean up the mess.
 		if (this._active) { return }
 		this._startLightspeed(event.timestamp)
-	}
-
-	_onRefreshLightspeed() {
-		if (!this._active) { return }
-		this._lightspeed.extended = true
 	}
 
 	_onRemoveLightspeed() {
@@ -93,7 +83,6 @@ export default class LIGHTSPEED extends Module {
 		this._lightspeed = {
 			start,
 			end: null,
-			extended: false,
 			casts: [],
 		}
 
@@ -127,15 +116,17 @@ export default class LIGHTSPEED extends Module {
 	output() {
 		const noCastsMessage = <Fragment>
 			<p>
-				<span className="text-error"><Trans id="ast.lightspeed.messages.no-casts">Zero casts recorded for <ActionLink {...ACTIONS.LIGHTSPEED} /></Trans></span>
+				<span className="text-error"><Trans id="ast.lightspeed.messages.no-casts">There were no casts recorded for <ActionLink {...ACTIONS.LIGHTSPEED} /></Trans></span>
 			</p>
 		</Fragment>
 
 		const panels = this._history.map(lightspeed => {
-			const numGcds = lightspeed.casts.filter(cast => getAction(cast.ability.guid).onGcd).length
-			const mpSavings = lightspeed.casts
-				.filter(cast => getAction(cast.ability.guid).onGcd)
-				.reduce((totalSavings, cast) => getAction(cast.ability.guid).mpCost / 2 + totalSavings, 0)
+			const gcdActions = lightspeed.casts
+				.map(cast => getDataBy(ACTIONS, 'id', cast.ability.guid))
+				.filter(action => action && action.onGcd)
+			const numGcds = gcdActions.length
+			const mpSavings = gcdActions
+				.reduce((totalSavings, action) => action.mpCost / 2 + totalSavings, 0)
 			// TODO: Use mpCostFactor instead of mpCost to be level agnostic
 
 			return {
@@ -143,9 +134,8 @@ export default class LIGHTSPEED extends Module {
 				title: {
 					content: <>
 						{this.parser.formatTimestamp(lightspeed.start)}
-						&nbsp;-&nbsp;{numGcds} GCDs
-						&nbsp;-&nbsp;{mpSavings} MP saved
-						{lightspeed.extended && <span className="text-info">&nbsp;(extended)</span>}
+						&nbsp;-&nbsp;<Trans id="ast.lightspeed.rotation.gcd"><Plural value={numGcds} one="# GCD" other="# GCDs"/></Trans>
+						&nbsp;-&nbsp;{mpSavings} <Trans id="ast.lightspeed.rotation.mp-saved">MP saved</Trans>
 					</>,
 				},
 				content: {
@@ -164,9 +154,10 @@ export default class LIGHTSPEED extends Module {
 		return <Fragment>
 			<p>
 				<Trans id="ast.lightspeed.messages.explanation">
-				Some of the applications of <ActionLink {...ACTIONS.LIGHTSPEED} /> include MP savings on heavy healing segments, keeping casts up while on the move and for weaving OGCDs.
-				To further complicate usage, <ActionLink {...ACTIONS.ESSENTIAL_DIGNITY} /> can reduce the cooldown, and the buff can be extended by <ActionLink {...ACTIONS.CELESTIAL_OPPOSITION} />.<br/><br/>
-				At this point of time it's difficult to identify what is optimal, since each fight calls for a different strategy.
+				The main use of <ActionLink {...ACTIONS.LIGHTSPEED} /> should be for weaving card actions during <ActionLink {...ACTIONS.DIVINATION} /> and <ActionLink {...ACTIONS.SLEEVE_DRAW} /> windows.<br/>
+                It can also be used for MP savings on heavy healing segments, keeping casts up while on the move and other specific scenarios.<br/>
+				Each fight calls for a different strategy, but try to utilize it as much as possible.<br/><br/>
+				Unless it's being used for <ActionLink {...ACTIONS.ASCEND} />, lightspeed should fit at least 6 GCDs.
 				</Trans>
 			</p>
 			{panels.length === 0 && noCastsMessage}

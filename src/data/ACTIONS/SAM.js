@@ -1,4 +1,13 @@
+import STATUSES from 'data/STATUSES'
+
 // Samurai Actions
+
+//Merge all 3 Tsubames into 1
+
+export const SAM_COOLDOWN_GROUP = {
+	TSUBAME: 16483,
+}
+
 export default {
 	//-----
 	//Player GCDs
@@ -8,7 +17,7 @@ export default {
 		name: 'Hakazae',
 		icon: 'https://xivapi.com/i/003000/003151.png',
 		onGcd: true,
-		potency:  150,
+		potency:  200,
 		combo: {
 			start: true,
 		},
@@ -22,7 +31,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 7477,
-			potency: 300,
+			potency: 340,
 		},
 	},
 
@@ -42,7 +51,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 7477,
-			potency: 300,
+			potency: 340,
 		},
 	},
 
@@ -61,7 +70,7 @@ export default {
 		name: 'Iaijutsu',
 		icon: 'https://xivapi.com/i/003000/003159.png',
 		onGcd: true,
-		castTime: 1.8,
+		castTime: 1.3,
 	},
 
 	HIGANBANA: {
@@ -69,7 +78,7 @@ export default {
 		name: 'Higanbana',
 		icon: 'https://xivapi.com/i/003000/003160.png',
 		onGcd: true,
-		castTime: 1.8,
+		castTime: 1.3,
 	},
 
 	GEKKO: {
@@ -80,7 +89,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 7478,
-			potency: 440,
+			potency: 480,
 			end: true,
 		},
 	},
@@ -103,7 +112,7 @@ export default {
 		name: 'Tenka Goken',
 		icon: 'https://xivapi.com/i/003000/003161.png',
 		onGcd: true,
-		castTime: 1.8,
+		castTime: 1.3,
 	},
 
 	KASHA: {
@@ -114,7 +123,7 @@ export default {
 		potency: 100,
 		combo: {
 			from: 7479,
-			potency: 440,
+			potency: 480,
 			end: true,
 		},
 	},
@@ -137,7 +146,7 @@ export default {
 		name: 'Midare Setsugekka',
 		icon: 'https://xivapi.com/i/003000/003162.png',
 		onGcd: true,
-		castTime: 1.8,
+		castTime: 1.3,
 	},
 
 	YUKIKAZE: {
@@ -162,6 +171,7 @@ export default {
 		name: 'Third Eye',
 		icon: 'https://xivapi.com/i/003000/003153.png',
 		cooldown: 15,
+		statusesApplied: [STATUSES.THIRD_EYE],
 	},
 
 	AGEHA: {
@@ -175,14 +185,15 @@ export default {
 		id: 7499,
 		name: 'Meikyo Shisui',
 		icon: 'https://xivapi.com/i/003000/003167.png',
-		cooldown: 80,
+		cooldown: 55,
+		statusesApplied: [STATUSES.MEIKYO_SHISUI],
 	},
 
 	HISSATSU_KAITEN: {
 		id: 7494,
 		name: 'Hissatsu: Kaiten',
 		icon: 'https://xivapi.com/i/003000/003168.png',
-		cooldown: 5,
+		cooldown: 1,
 	},
 
 	HISSATSU_GYOTEN: {
@@ -243,11 +254,75 @@ export default {
 		cooldown: 40,
 	},
 
+	IKISHOTEN: {
+		id: 16482,
+		name: 'Ikishoten',
+		icon: 'https://xivapi.com/i/003000/003179.png',
+		cooldown: 60,
+	},
+
 	HISSATSU_GUREN: {
 		id: 7496,
 		name: 'Hissatsu: Guren',
 		icon: 'https://xivapi.com/i/003000/003177.png',
 		cooldown: 120,
+		cooldownGroup: 10,
 	},
 
+	HISSATSU_SENEI: {
+		id: 16481,
+		name: 'Hissatsu: Senei',
+		icon: 'https://xivapi.com/i/003000/003177.png',
+		cooldown: 120,
+		cooldownGroup: 10,
+	},
+
+	TSUBAME_GAESHI: {
+		id: 16483,
+		name: 'Tsubame Gaeshi',
+		icon: 'https://xivapi.com/i/003000/003180.png',
+		onGcd: true,
+		gcdRecast: 2.5,
+		cooldown: 60,
+	},
+
+	KAESHI_HIGANBANA: {
+		id: 16484,
+		name: 'Kaeshi: Higanbana',
+		icon: 'https://xivapi.com/i/003000/003181.png',
+		onGcd: true,
+		cooldown: 60,
+		gcdRecast: 2.5,
+		cooldownGroup: SAM_COOLDOWN_GROUP.TSUBAME,
+	},
+
+	KAESHI_GOKEN: {
+		id: 16485,
+		name: 'Kaeshi: Goken',
+		icon: 'https://xivapi.com/i/003000/003182.png',
+		onGcd: true,
+		gcdRecast: 2.5,
+		cooldown: 60,
+		cooldownGroup: SAM_COOLDOWN_GROUP.TSUBAME,
+
+	},
+
+	KAESHI_SETSUGEKKA: {
+		id: 16486,
+		name: 'Kaeshi: Setsugekka',
+		icon: 'https://xivapi.com/i/003000/003183.png',
+		onGcd: true,
+		gcdRecast: 2.5,
+		cooldown: 60,
+		cooldownGroup: SAM_COOLDOWN_GROUP.TSUBAME,
+
+	},
+
+	SHOHA: {
+		id: 16487,
+		name: 'Shoha',
+		icon: 'https://xivapi.com/i/003000/003177.png',
+		cooldown: 1,
+	},
 }
+

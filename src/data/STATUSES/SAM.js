@@ -6,6 +6,11 @@ export default {
 		icon: 'https://xivapi.com/i/003000/003153.png',
 	},
 
+	EYES_OPEN: {
+		id: 1252,
+		name: 'Eyes Open',
+		icon: 'https://xivapi.com/i/003000/003153.png',
+	},
 	JINPU: 	{
 		id: 1298,
 		name: 'Jinpu',
@@ -28,7 +33,6 @@ export default {
 		id: 1228,
 		name: 'Higanbana',
 		icon: 'https://xivapi.com/i/013000/013304.png',
-
 	},
 
 	KAITEN: {

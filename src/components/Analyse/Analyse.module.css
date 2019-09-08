@@ -11,16 +11,9 @@
 }
 
 .resultsContainer {
-	margin-bottom: 25vh;
+	margin-bottom: 50vh;
 }
 
-.menuLogo {
-	display: inline-block !important;
-	width: 2.5em !important;
-	margin-right: .75rem !important;
-}
-
-.sticky {
-	position: sticky;
-	top: 50px;
+.seeMore {
+	margin: 0 5px;
 }

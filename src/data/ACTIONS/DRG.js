@@ -1,4 +1,6 @@
-export default{
+import STATUSES from 'data/STATUSES'
+
+export default {
 	// -----
 	// Player GCDs
 	// -----
@@ -7,7 +9,7 @@ export default{
 		name: 'Doom Spike',
 		icon: 'https://xivapi.com/i/000000/000306.png',
 		onGcd: true,
-		potency: 140,
+		potency: 170,
 		combo: {
 			start: true,
 		},
@@ -18,6 +20,7 @@ export default{
 		name: 'Fang and Claw',
 		icon: 'https://xivapi.com/i/002000/002582.png',
 		onGcd: true,
+		potency: 360,
 	},
 
 	WHEELING_THRUST: {
@@ -25,6 +28,18 @@ export default{
 		name: 'Wheeling Thrust',
 		icon: 'https://xivapi.com/i/002000/002584.png',
 		onGcd: true,
+		potency: 360,
+	},
+
+	RAIDEN_THRUST: {
+		id: 16479,
+		name: 'Raiden Thrust',
+		icon: 'https://xivapi.com/i/002000/002592.png',
+		onGcd: true,
+		potency: 330,
+		combo: {
+			start: true,
+		},
 	},
 
 	SONIC_THRUST: {
@@ -35,7 +50,19 @@ export default{
 		potency: 100,
 		combo: {
 			from: 86,
-			potency: 180,
+			potency: 200,
+		},
+	},
+
+	COERTHAN_TORMENT: {
+		id: 16477,
+		name: 'Coerthan Torment',
+		icon: 'https://xivapi.com/i/002000/002590.png',
+		onGcd: true,
+		potency: 100,
+		combo: {
+			from: 7397,
+			potency: 230,
 			end: true,
 		},
 	},
@@ -47,6 +74,13 @@ export default{
 		id: 92,
 		name: 'Jump',
 		icon: 'https://xivapi.com/i/002000/002576.png',
+		cooldown: 30,
+	},
+
+	HIGH_JUMP: {
+		id: 16478,
+		name: 'High Jump',
+		icon: 'https://xivapi.com/i/002000/002591.png',
 		cooldown: 30,
 	},
 
@@ -77,6 +111,7 @@ export default{
 		name: 'Battle Litany',
 		icon: 'https://xivapi.com/i/002000/002585.png',
 		cooldown: 180,
+		statusesApplied: [STATUSES.BATTLE_LITANY],
 	},
 
 	BLOOD_OF_THE_DRAGON: {
@@ -98,6 +133,7 @@ export default{
 		name: 'Dragon Sight',
 		icon: 'https://xivapi.com/i/002000/002587.png',
 		cooldown: 120,
+		statusesApplied: [STATUSES.RIGHT_EYE, STATUSES.LEFT_EYE, STATUSES.RIGHT_EYE_SOLO],
 	},
 
 	MIRAGE_DIVE: {
@@ -105,7 +141,7 @@ export default{
 		name: 'Mirage Dive',
 		icon: 'https://xivapi.com/i/002000/002588.png',
 		cooldown: 1,
-		potency: 210,
+		potency: 250,
 	},
 
 	NASTROND: {
@@ -113,5 +149,12 @@ export default{
 		name: 'Nastrond',
 		icon: 'https://xivapi.com/i/002000/002589.png',
 		cooldown: 10,
+	},
+
+	STARDIVER: {
+		id: 16480,
+		name: 'Stardiver',
+		icon: 'https://xivapi.com/i/002000/002593.png',
+		cooldown: 30,
 	},
 }

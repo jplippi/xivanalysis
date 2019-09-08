@@ -1,7 +1,7 @@
+import {MessageDescriptor} from '@lingui/core'
+import {Ability, AbilityEvent, Event, Pet} from 'fflogs'
 import {cloneDeep} from 'lodash'
 import 'reflect-metadata'
-
-import {Ability, AbilityEvent, Event, Pet} from 'fflogs'
 import Parser from './Parser'
 
 export enum DISPLAY_ORDER {
@@ -10,13 +10,20 @@ export enum DISPLAY_ORDER {
 	BOTTOM = 100,
 }
 
+export enum DISPLAY_MODE {
+	COLLAPSIBLE,
+	FULL,
+	/** Don't use this unless you know what you're doing, and you've run it past me. */
+	RAW,
+}
+
 export function dependency(target: Module, prop: string) {
 	const dependency = Reflect.getMetadata('design:type', target, prop)
 	const constructor = target.constructor as typeof Module
 
 	// Make sure we're not modifying every single module
-	if (constructor.dependencies === Module.dependencies) {
-		constructor.dependencies = []
+	if (!constructor.hasOwnProperty('dependencies')) {
+		constructor.dependencies = [...constructor.dependencies]
 	}
 
 	// If the dep is Object, it's _probably_ from a JS file. Fall back to simple handling
@@ -54,7 +61,7 @@ type Filter<T extends Event> = FilterPartial<T> & FilterPartial<{
 
 type HookCallback<T extends Event> = (event: T) => void
 
-interface Hook<T extends Event> {
+export interface Hook<T extends Event> {
 	events: Array<T['type']>
 	filter: Filter<T>
 	callback: HookCallback<T>
@@ -63,6 +70,7 @@ interface Hook<T extends Event> {
 export default class Module {
 	static dependencies: Array<string | MappedDependency> = []
 	static displayOrder: number = DISPLAY_ORDER.DEFAULT
+	static displayMode: DISPLAY_MODE
 	// TODO: Refactor this var
 	static i18n_id?: string // tslint:disable-line
 
@@ -79,7 +87,7 @@ export default class Module {
 		this._handle = value
 	}
 
-	private static _title: string
+	private static _title: string | MessageDescriptor
 	static get title() {
 		if (!this._title) {
 			this._title = this.handle.charAt(0).toUpperCase() + this.handle.slice(1)
@@ -106,6 +114,14 @@ export default class Module {
 			// but this is still required for JS modules (and internal handling)
 			(this as any)[dep.prop] = parser.modules[dep.handle]
 		})
+	}
+
+	/**
+	 * Because JS construct order is jank and nobody can fix it. Don't call this.
+	 * Please. I'm begging you.
+	 * @todo refactor `init` to public so this shit isn't needed.
+	 */
+	doTheMagicInitDance() {
 		this.init()
 	}
 
@@ -146,7 +162,7 @@ export default class Module {
 		// I'm currently handling hooks at the module level
 		// Should performance become a concern, this can be moved up to the Parser without breaking the API
 		const cb = typeof filterArg === 'function'? filterArg : cbArg
-		let filter = typeof filterArg === 'function'? {} : filterArg
+		let filter: Filter<T> = typeof filterArg === 'function'? {} : filterArg
 
 		// If there's no callback just... stop
 		if (!cb) { return }
@@ -154,7 +170,7 @@ export default class Module {
 		// QoL filter transforms
 		filter = this.mapFilterEntity(filter, 'to', 'targetID')
 		filter = this.mapFilterEntity(filter, 'by', 'sourceID')
-		if (filter.abilityId) {
+		if (filter.abilityId !== undefined) {
 			const abilityFilter = filter as Filter<AbilityEvent>
 			if (!abilityFilter.ability) {
 				abilityFilter.ability = {}
@@ -211,7 +227,7 @@ export default class Module {
 				filter[raw] = this.parser.player.pets.map((pet: Pet) => pet.id) as any
 				break
 			default:
-				filter[raw] = filter[qol]
+				filter[raw] = filter[qol] as any
 		}
 
 		delete filter[qol]
@@ -248,7 +264,7 @@ export default class Module {
 		})
 	}
 
-	private _filterMatches<T, F extends FilterPartial<T>>(event: T, filter: F) {
+	private _filterMatches<T extends object, F extends FilterPartial<T>>(event: T, filter: F) {
 		const match = Object.keys(filter).every(key => {
 			// If the event doesn't have the key we're looking for, just shortcut out
 			if (!event.hasOwnProperty(key)) {

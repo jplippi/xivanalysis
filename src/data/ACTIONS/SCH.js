@@ -1,13 +1,14 @@
-import PETS from '../PETS'
+import STATUSES from 'data/STATUSES'
 
 export default {
 	// -----
 	// Player
 	// -----
-	MIASMA_II: {
-		id: 177,
-		name: 'Miasma II',
-		icon: 'https://xivapi.com/i/000000/000506.png',
+
+	BIOLYSIS: {
+		id: 16540,
+		name: 'Biolysis',
+		icon: 'https://xivapi.com/i/002000/002820.png',
 		onGcd: true,
 	},
 
@@ -19,12 +20,56 @@ export default {
 		castTime: 2,
 	},
 
+	BROIL_III: {
+		id: 16541,
+		name: 'Broil III',
+		icon: 'https://xivapi.com/i/002000/002821.png',
+		onGcd: true,
+		castTime: 2.5,
+	},
+
+	SCH_RUIN_II: {
+		id: 17870,
+		name: 'Ruin II',
+		icon: 'https://xivapi.com/i/000000/000502.png',
+		onGcd: true,
+	},
+
+	RECITATION: {
+		id: 16542,
+		name: 'Recitation',
+		icon: 'https://xivapi.com/i/002000/002822.png',
+		cooldown: 90,
+	},
+
+	// This is the action cast by the SCH
+	SCH_FEY_BLESSING: {
+		id: 16543,
+		name: 'Fey Blessing',
+		icon: 'https://xivapi.com/i/002000/002854.png',
+		cooldown: 60,
+	},
+
+	SUMMON_SERAPH: {
+		id: 16545,
+		name: 'Summon Seraph',
+		icon: 'https://xivapi.com/i/002000/002850.png',
+		cooldown: 120,
+	},
+
+	SCH_CONSOLATION: {
+		id: 16546,
+		name: 'Consolation',
+		icon: 'https://xivapi.com/i/002000/002851.png',
+		cooldown: 20,
+	},
+
 	SUCCOR: {
 		id: 186,
 		name: 'Succor',
 		icon: 'https://xivapi.com/i/002000/002802.png',
 		onGcd: true,
-		castTime: 2.5,
+		castTime: 2,
 	},
 
 	SACRED_SOIL: {
@@ -39,6 +84,13 @@ export default {
 		name: 'Lustrate',
 		icon: 'https://xivapi.com/i/002000/002805.png',
 		cooldown: 1,
+	},
+
+	ART_OF_WAR: {
+		id: 16539,
+		name: 'Art of War',
+		icon: 'https://xivapi.com/i/002000/002819.png',
+		onGcd: true,
 	},
 
 	INDOMITABILITY: {
@@ -67,7 +119,7 @@ export default {
 		id: 3586,
 		name: 'Emergency Tactics',
 		icon: 'https://xivapi.com/i/002000/002809.png',
-		cooldown: 20,
+		cooldown: 15,
 	},
 
 	DISSIPATION: {
@@ -75,6 +127,7 @@ export default {
 		name: 'Dissipation',
 		icon: 'https://xivapi.com/i/002000/002810.png',
 		cooldown: 180,
+		statusesApplied: [STATUSES.DISSIPATION],
 	},
 
 	EXCOGITATION: {
@@ -97,6 +150,7 @@ export default {
 		name: 'Chain Stratagem',
 		icon: 'https://xivapi.com/i/002000/002815.png',
 		cooldown: 120,
+		statusesApplied: [STATUSES.CHAIN_STRATAGEM],
 	},
 
 	SCH_AETHERPACT: {
@@ -113,73 +167,108 @@ export default {
 		cooldown: 1,
 	},
 
+	SCH_WHISPERING_DAWN: {
+		id: 16537,
+		name: 'Whispering Dawn',
+		icon: 'https://xivapi.com/i/002000/002827.png',
+		cooldown: 60,
+		statusesApplied: [STATUSES.WHISPERING_DAWN],
+	},
+
+	SCH_FEY_ILLUMINATION: {
+		id: 16538,
+		name: 'Fey Illumination',
+		icon: 'https://xivapi.com/i/002000/002829.png',
+		cooldown: 120,
+	},
+
+	SCH_ENERGY_DRAIN: {
+		id: 167,
+		name: 'Energy Drain',
+		icon: 'https://xivapi.com/i/000000/000514.png',
+		cooldown: 3,
+	},
+
+	SUMMON_EOS: {
+		id: 17215,
+		name: 'Summon Eos',
+		icon: 'https://xivapi.com/i/002000/002823.png',
+		onGcd: true,
+		castTime: 2.5,
+	},
+
+	SUMMON_SELENE: {
+		id: 17216,
+		name: 'Summon Selene',
+		icon: 'https://xivapi.com/i/002000/002824.png',
+		onGcd: true,
+		castTime: 2.5,
+	},
+
 	// -----
-	// Pet
+	// PET ACTIONS
 	// -----
-	// Eos
-	EOS_EMBRACE: {
+	EMBRACE: {
 		id: 802,
 		name: 'Embrace',
 		icon: 'https://xivapi.com/i/002000/002826.png',
-		pet: PETS.EOS.id,
+		cooldown: 3,
+		pet: true,
 	},
 
 	WHISPERING_DAWN: {
 		id: 803,
 		name: 'Whispering Dawn',
 		icon: 'https://xivapi.com/i/002000/002827.png',
-		pet: PETS.EOS.id,
-	},
-
-	FEY_COVENANT: {
-		id: 804,
-		name: 'Fey Covenant',
-		icon: 'https://xivapi.com/i/002000/002828.png',
-		pet: PETS.EOS.id,
+		pet: true,
 	},
 
 	FEY_ILLUMINATION: {
 		id: 805,
 		name: 'Fey Illumination',
 		icon: 'https://xivapi.com/i/002000/002829.png',
-		pet: PETS.EOS.id,
+		pet: true,
 	},
 
-	// Selene
-	SELENE_EMBRACE: {
-		id: 806,
-		name: 'Embrace',
-		icon: 'https://xivapi.com/i/002000/002836.png',
-		pet: PETS.SELENE.id,
+	FEY_BLESSING: {
+		id: 16544,
+		name: 'Fey Blessing',
+		icon: 'https://xivapi.com/i/002000/002855.png',
+		pet: true,
 	},
 
-	SILENT_DUSK: {
-		id: 807,
-		name: 'Silent Dusk',
-		icon: 'https://xivapi.com/i/002000/002837.png',
-		pet: PETS.SELENE.id,
+	SERAPHIC_VEIL: {
+		id: 16548,
+		name: 'Seraphic Veil',
+		icon: 'https://xivapi.com/i/0020000/002847.png',
+		pet: true,
 	},
 
-	FEY_CARESS: {
-		id: 810,
-		name: 'Fey Caress',
-		icon: 'https://xivapi.com/i/002000/002811.png',
-		pet: PETS.SELENE.id,
+	CONSOLATION: {
+		id: 16547,
+		name: 'Consolation',
+		icon: 'https://xivapi.com/i/002000/002846.png',
+		pet: true,
 	},
 
-	FEY_WIND: {
-		id: 811,
-		name: 'Fey Wind',
-		icon: 'https://xivapi.com/i/002000/002812.png',
-		pet: PETS.SELENE.id,
+	ANGELS_WHISPER: {
+		id: 16550,
+		name: 'Angel\'s Whisper',
+		icon: 'https://xivapi.com/i/002000/002848.png',
+		pet: true,
 	},
 
-	// -----
-	// Traits
-	// -----
-	QUICKENED_AETHERFLOW: {
-		id: 50389,
-		name: 'Quickened Aetherflow',
-		icon: 'https://xivapi.com/i/005000/005393.png',
+	FEY_UNION: {
+		id: 7438,
+		name: 'Fey Union',
+		icon: 'https://xivapi.com/i/002000/002818.png',
+		pet: true,
+	},
+
+	SERAPHIC_ILLUMINATION: {
+		id: 16551,
+		name: 'Seraphic Illumination',
+		icon: 'https://xivapi.com/i/002000/002849.png',
+		pet: true,
 	},
 }

@@ -1,41 +1,49 @@
 import {Trans} from '@lingui/react'
-import {
-	Provider as TooltipProvider,
-	tooltipHOC,
-} from '@xivanalysis/tooltips'
+import {Provider as TooltipProvider, tooltipHOC} from '@xivanalysis/tooltips'
+import {ITEM_ID_OFFSET} from 'data/ACTIONS/ITEMS'
+import {STATUS_ID_OFFSET} from 'data/STATUSES'
+import {useObserver} from 'mobx-react-lite'
 import PropTypes from 'prop-types'
 import React from 'react'
-import {connect} from 'react-redux'
-import {Popup, Icon} from 'semantic-ui-react'
-
-import {STATUS_ID_OFFSET} from 'data/STATUSES'
-
+import {Icon, Popup} from 'semantic-ui-react'
 import styles from './DbLink.module.css'
+import {StoreContext} from 'store'
 
-// Wrapping the provider w/ connect to pick up lang changes
-export const Provider = connect(state => ({
-	language: state.language.site,
-}))(({language, children}) => <TooltipProvider language={language}>
-	{children}
-</TooltipProvider>)
+// Wrapping the provider w/ the store to pick up lang changes
+export const Provider = ({children}) => {
+	const {i18nStore} = React.useContext(StoreContext)
+
+	return useObserver(() => (
+		<TooltipProvider
+			language={i18nStore.gameLanguage}
+			apiKey={process.env.REACT_APP_XIVAPI_API_KEY}
+		>
+			{children}
+		</TooltipProvider>
+	))
+}
 
 class TooltipBase extends React.PureComponent {
 	static propTypes = {
 		// Props from the HOC
 		baseUrl: PropTypes.string,
 		loading: PropTypes.bool.isRequired,
-		data: PropTypes.object,
+		data: PropTypes.oneOfType(PropTypes.object, PropTypes.symbol),
 		Content: PropTypes.any,
 
 		// Other props we accept
 		children: PropTypes.node,
 		showIcon: PropTypes.bool.isRequired,
 		showTooltip: PropTypes.bool.isRequired,
+		showName: PropTypes.bool.isRequired,
+		name: PropTypes.string,
+		iconSize: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
 	}
 
 	static defaultProps = {
 		showIcon: true,
 		showTooltip: true,
+		showName: true,
 	}
 
 	render() {
@@ -49,18 +57,25 @@ class TooltipBase extends React.PureComponent {
 			children,
 			showIcon,
 			showTooltip,
+			showName,
+			name,
+			iconSize,
 		} = this.props
 
 		if (loading) {
 			return <span>
 				{showIcon && <Icon loading name="circle notch" />}
-				{children || <Trans id="core.dblink.loading">Loading...</Trans>}
+				{showName && (
+					children ||
+					name ||
+					<Trans id="core.dblink.loading">Loading...</Trans>
+				)}
 			</span>
 		}
 
 		const link = <span>
-			{showIcon && <img src={baseUrl + data.icon} alt="" className={styles.image}/>}
-			<span className={styles.link}>{children || data.name}</span>
+			{showIcon && <img src={baseUrl + data.icon} alt="" className={styles.image} style={{height: iconSize}}/>}
+			{showName && <span className={styles.link}>{children || data.name}</span>}
 		</span>
 
 		if (!showTooltip) {
@@ -87,7 +102,16 @@ export const StatusLink = props => <Tooltip
 	{...props}
 	id={props.id - STATUS_ID_OFFSET}
 />
+export const ItemLink = props => <Tooltip
+	type="Item"
+	{...props}
+	id={props.id - ITEM_ID_OFFSET}
+/>
 
 StatusLink.propTypes = {
+	id: PropTypes.number.isRequired,
+}
+
+ItemLink.propTypes = {
 	id: PropTypes.number.isRequired,
 }

@@ -1,10 +1,12 @@
-import {Trans, i18nMark} from '@lingui/react'
+import {t} from '@lingui/macro'
+import {Trans} from '@lingui/react'
 import React from 'react'
 import {Grid, Message, Icon, Segment} from 'semantic-ui-react'
 
 import ContributorLabel from 'components/ui/ContributorLabel'
-import {getPatch, patchSupported} from 'data/PATCHES'
-import Module from 'parser/core/Module'
+import NormalisedMessage from 'components/ui/NormalisedMessage'
+import {patchSupported, languageToEdition} from 'data/PATCHES'
+import Module, {DISPLAY_MODE} from 'parser/core/Module'
 import DISPLAY_ORDER from './DISPLAY_ORDER'
 
 import styles from './About.module.css'
@@ -12,9 +14,10 @@ import styles from './About.module.css'
 export default class About extends Module {
 	static handle = 'about'
 	static displayOrder = DISPLAY_ORDER.ABOUT
-	static i18n_id = i18nMark('core.about.title')
+	static displayMode = DISPLAY_MODE.FULL
+	static title = t('core.about.title')`About`
 
-	description = null
+	Description = null
 	contributors = []
 
 	supportedPatches = null
@@ -36,7 +39,7 @@ export default class About extends Module {
 		super(...args)
 
 		// Merge the parser's metadata in
-		const fields = ['description', 'contributors', 'supportedPatches']
+		const fields = ['Description', 'contributors', 'supportedPatches']
 		fields.forEach(field => {
 			this[field] = this.parser.meta[field]
 		})
@@ -60,11 +63,16 @@ export default class About extends Module {
 
 		// Work out the supported patch range (and if we're in it)
 		const {from, to = from} = this.supportedPatches
-		const supported = patchSupported(from, to, this.parser.parseDate)
+		const supported = patchSupported(
+			languageToEdition(this.parser.report.lang),
+			from,
+			to,
+			this.parser.parseDate,
+		)
 
 		return <Grid>
 			<Grid.Column mobile={16} computer={10}>
-				{this.description}
+				<this.Description/>
 				{!supported && <Message error icon>
 					<Icon name="times circle outline"/>
 					<Message.Content>
@@ -72,7 +80,7 @@ export default class About extends Module {
 							<Trans id="core.about.patch-unsupported.title">Report patch unsupported</Trans>
 						</Message.Header>
 						<Trans id="core.about.patch-unsupported.description">
-							This report was logged during patch {getPatch(this.parser.parseDate)}, which is not supported by the analyser. Calculations and suggestions may be impacted by changes in the interim.
+							This report was logged during patch {this.parser.patch.key}, which is not supported by the analyser. Calculations and suggestions may be impacted by changes in the interim.
 						</Trans>
 					</Message.Content>
 				</Message>}
@@ -96,7 +104,7 @@ export default class About extends Module {
 								>
 									<ContributorLabel
 										contributor={user}
-										detail={role && role.i18n_id ? <Trans id={role.i18n_id} defaults={role.text} /> : role}
+										detail={role && <NormalisedMessage message={role.text}/>}
 									/>
 								</div>
 							})}

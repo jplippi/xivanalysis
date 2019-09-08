@@ -1,11 +1,13 @@
+import {t} from '@lingui/macro'
+import {Trans} from '@lingui/react'
 import math from 'mathjsCustom'
 import React from 'react'
-import {Message, Icon} from 'semantic-ui-react'
-import {i18nMark, Trans} from '@lingui/react'
 
-import {getAction} from 'data/ACTIONS'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import Module from 'parser/core/Module'
 import {Group, Item} from './Timeline'
+import {SimpleStatistic} from './Statistics'
 
 const MIN_GCD = 1500
 const MAX_GCD = 2500
@@ -24,15 +26,15 @@ export default class GlobalCooldown extends Module {
 	static handle = 'gcd'
 	static dependencies = [
 		// We need this to normalise before us
-		'precastAction', // eslint-disable-line xivanalysis/no-unused-dependencies
-		'castTime', // eslint-disable-line xivanalysis/no-unused-dependencies
+		'precastAction', // eslint-disable-line @xivanalysis/no-unused-dependencies
+		'castTime', // eslint-disable-line @xivanalysis/no-unused-dependencies
 		'downtime',
 		'speedmod',
+		'statistics',
 		'timeline',
 	]
 
-	static i18n_id = i18nMark('core.gcd.title')
-	static title = 'Global Cooldown'
+	static title = t('core.gcd.title')`Global Cooldown`
 
 	_castingEvent = null
 
@@ -58,8 +60,8 @@ export default class GlobalCooldown extends Module {
 
 			// Only care about player GCDs
 			if (!this.parser.byPlayer(event) || !event.ability) { continue }
-			const action = getAction(event.ability.guid)
-			if (!action.onGcd) { continue }
+			const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+			if (!action || !action.onGcd) { continue }
 
 			// eslint-disable-next-line default-case
 			switch (event.type) {
@@ -100,7 +102,7 @@ export default class GlobalCooldown extends Module {
 		// - Sub-0.5s speedmod for BLM fast-casts and correct Instant/CasterTaxed flagging
 		// - Correct timestamp for last event before long gaps (ie: Kefka normal)
 		this.gcds.forEach((gcd) => {
-			console.log(this.parser.formatTimestamp(gcd.timestamp) + ' ' + getAction(gcd.actionId).name + '[' + gcd.length +
+			console.log(this.parser.formatTimestamp(gcd.timestamp) + ' ' + getDataBy(ACTIONS, 'id', gcd.actionId).name + '[' + gcd.length +
 						'|' + gcd.normalizedLength + '] Speedmod[' + gcd.speedMod + ']' +
 						(gcd.isInstant ? ' Instant' : '') + (gcd.casterTaxed ? ' CasterTaxed' : ''))
 		})
@@ -109,6 +111,7 @@ export default class GlobalCooldown extends Module {
 	_onComplete() {
 		const startTime = this.parser.fight.start_time
 
+		// Timeline output
 		// TODO: Look into adding items to groups? Maybe?
 		this.timeline.addGroup(new Group({
 			id: 'gcd',
@@ -117,7 +120,8 @@ export default class GlobalCooldown extends Module {
 		}))
 
 		this.gcds.forEach(gcd => {
-			const action = getAction(gcd.actionId)
+			const action = getDataBy(ACTIONS, 'id', gcd.actionId)
+			if (!action) { return }
 			this.timeline.addItem(new Item({
 				type: 'background',
 				start: gcd.timestamp - startTime,
@@ -126,6 +130,20 @@ export default class GlobalCooldown extends Module {
 				content: <img src={action.icon} alt={action.name}/>,
 			}))
 		})
+
+		// Statistic box
+		const estimate = this.getEstimate(false)
+
+		this.statistics.add(new SimpleStatistic({
+			title: <Trans id="core.gcd.estimated-gcd">Estimated GCD</Trans>,
+			icon: ACTIONS.ATTACK.icon,
+			value: this.parser.formatDuration(estimate),
+			info: (
+				<Trans id="core.gcd.no-statistics">
+					Unfortunately, player statistics are not available from FF Logs. As such, the calculated GCD length is an <em>estimate</em>, and may well be incorrect. If it is reporting a GCD length <em>longer</em> than reality, you likely need to focus on keeping your GCD rolling.
+				</Trans>
+			),
+		}))
 	}
 
 	//saveGcd(event, isInstant) {
@@ -134,7 +152,8 @@ export default class GlobalCooldown extends Module {
 			return
 		}
 
-		const action = getAction(gcdInfo.event.ability.guid)
+		const action = getDataBy(ACTIONS, 'id', gcdInfo.event.ability.guid)
+		if (!action || !action.id) { return }
 		let speedMod = this.speedmod.get(gcdInfo.event.timestamp)
 		let castTime = action.castTime
 
@@ -157,27 +176,31 @@ export default class GlobalCooldown extends Module {
 			isCasterTaxed = true
 		}
 
-		let normalizedGcd = gcdLength
-		if (!gcdInfo.isInstant) {
-			normalizedGcd = normalizedGcd * ((BASE_GCD / 1000) / castTime)
-		}
+		const correctedCooldown = action.gcdRecast != null
+			? action.gcdRecast
+			: action.cooldown
 
-		normalizedGcd *= (1 / speedMod)
-		normalizedGcd = Math.round(normalizedGcd)
+		const normaliseWith = gcdInfo.isInstant
+			? correctedCooldown
+			: castTime
 
-		if (action.id) {
-			this.gcds.push({
-				timestamp: gcdInfo.event.timestamp,
-				length: gcdLength,
-				normalizedLength: normalizedGcd,
-				speedMod: speedMod,
-				castTime: castTime,
-				cooldown: action.cooldown,
-				casterTaxed: isCasterTaxed,
-				actionId: action.id,
-				isInstant: gcdInfo.isInstant,
-			})
-		}
+		const normalizedGcd = Math.round(
+			gcdLength
+			* ((BASE_GCD / 1000) / normaliseWith)
+			* (1 / speedMod)
+		)
+
+		this.gcds.push({
+			timestamp: gcdInfo.event.timestamp,
+			length: gcdLength,
+			normalizedLength: normalizedGcd,
+			speedMod,
+			castTime,
+			cooldown: correctedCooldown,
+			casterTaxed: isCasterTaxed,
+			actionId: action.id,
+			isInstant: gcdInfo.isInstant,
+		})
 	}
 
 	getEstimate(bound = true) {
@@ -213,37 +236,19 @@ export default class GlobalCooldown extends Module {
 	}
 
 	_getGcdLength(gcd) {
-		const cooldownRatio = this.getEstimate() / MAX_GCD
+		let cooldown = (gcd.isInstant || gcd.castTime <= gcd.cooldown)
+			? gcd.cooldown
+			: Math.max(gcd.castTime, gcd.cooldown)
+		cooldown *= 1000
 
-		let cd = (gcd.isInstant || gcd.castTime <= gcd.cooldown) ? gcd.cooldown : Math.max(gcd.castTime, gcd.cooldown)
-		cd *= 1000
+		// Some actions are lower than or equal to min gcd, only adjust with ratios when they are not
+		if (cooldown > MIN_GCD) {
+			const cooldownRatio = this.getEstimate() / MAX_GCD
+			cooldown = Math.max(MIN_GCD, cooldown * cooldownRatio * gcd.speedMod)
+		}
 
-		const duration = Math.round((cd * cooldownRatio * gcd.speedMod) + (gcd.casterTaxed ? CASTER_TAX : 0))
+		const duration = Math.round(cooldown + (gcd.casterTaxed ? CASTER_TAX : 0))
 
 		return duration
-	}
-
-	output() {
-		const estimate = this.getEstimate(false)
-
-		return <>
-			<Message info icon>
-				<Icon name="info"/>
-				<Message.Content>
-					<Trans id="core.gcd.no-statistics">
-						Unfortunately, player statistics are not available from FF Logs. As such, the following GCD length is an <em>estimate</em>, and may well be incorrect. If it is reporting a GCD length <em>longer</em> than reality, you likely need to focus on keeping your GCD rolling.
-					</Trans>
-				</Message.Content>
-			</Message>
-			{estimate !== this.getEstimate(true) && <Message warning>
-				<Icon name="warning sign"/>
-				<Trans id="core.gcd.invalid-gcd">
-					The estimated GCD falls outside possible GCD values, and has been bounded to {this.parser.formatDuration(this.getEstimate(true))} for calculations.
-				</Trans>
-			</Message>}
-			<Trans id="core.gcd.estimate">
-				Estimated GCD: <strong>{this.parser.formatDuration(estimate)}</strong>
-			</Trans>
-		</>
 	}
 }

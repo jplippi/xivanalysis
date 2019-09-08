@@ -1,10 +1,12 @@
+import STATUSES from 'data/STATUSES'
+
 export default {
 	HEAVY_SHOT: {
 		id: 97,
 		name: 'Heavy Shot',
 		icon: 'https://xivapi.com/i/000000/000358.png',
 		onGcd: true,
-		potency: 150,
+		potency: 180,
 	},
 	VENOMOUS_BITE: {
 		id: 100,
@@ -18,7 +20,7 @@ export default {
 		name: 'Quick Nock',
 		icon: 'https://xivapi.com/i/000000/000360.png',
 		onGcd: true,
-		potency: 110,
+		potency: 150,
 	},
 	BLOODLETTER: {
 		id: 110,
@@ -26,14 +28,14 @@ export default {
 		icon: 'https://xivapi.com/i/000000/000361.png',
 		onGcd: false,
 		cooldown: 15,
-		potency: 130,
+		potency: 150,
 	},
 	STRAIGHT_SHOT: {
 		id: 98,
 		name: 'Straight Shot',
 		icon: 'https://xivapi.com/i/000000/000359.png',
 		onGcd: true,
-		potency: 140,
+		potency: 200,
 	},
 	BARRAGE: {
 		id: 107,
@@ -41,14 +43,7 @@ export default {
 		icon: 'https://xivapi.com/i/000000/000353.png',
 		onGcd: false,
 		cooldown: 80,
-	},
-	MISERYS_END: {
-		id: 103,
-		name: 'Misery\'s End',
-		icon: 'https://xivapi.com/i/000000/000364.png',
-		onGcd: false,
-		cooldown: 12,
-		potency: 190,
+		statusesApplied: [STATUSES.BARRAGE],
 	},
 	WINDBITE: {
 		id: 113,
@@ -63,6 +58,7 @@ export default {
 		icon: 'https://xivapi.com/i/000000/000352.png',
 		onGcd: false,
 		cooldown: 80,
+		statusesApplied: [STATUSES.RAGING_STRIKES],
 	},
 	REPELLING_SHOT: {
 		id: 112,

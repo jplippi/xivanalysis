@@ -1,14 +1,14 @@
-import {Trans, i18nMark} from '@lingui/react'
+import {t} from '@lingui/macro'
+import {Trans, Plural} from '@lingui/react'
 import React from 'react'
 
 import {ActionLink, StatusLink} from 'components/ui/DbLink'
-import PieChartWithLegend from 'components/ui/PieChartWithLegend'
-import ACTIONS, {getAction} from 'data/ACTIONS'
-import JOBS, {ROLES} from 'data/JOBS'
-import PATCHES, {getPatch} from 'data/PATCHES'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import PETS from 'data/PETS'
 import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
+import {PieChartStatistic} from 'parser/core/modules/Statistics'
 import {Suggestion, TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
 
 import DISPLAY_ORDER from './DISPLAY_ORDER'
@@ -20,6 +20,7 @@ const SUMMON_ACTIONS = {
 	[ACTIONS.SUMMON_II.id]: PETS.TITAN_EGI.id,
 	[ACTIONS.SUMMON_III.id]: PETS.IFRIT_EGI.id,
 	[ACTIONS.SUMMON_BAHAMUT.id]: PETS.DEMI_BAHAMUT.id,
+	[ACTIONS.FIREBIRD_TRANCE.id]: PETS.DEMI_PHOENIX.id,
 }
 
 const CHART_COLOURS = {
@@ -28,12 +29,28 @@ const CHART_COLOURS = {
 	[PETS.TITAN_EGI.id]: '#ffbf23',
 	[PETS.IFRIT_EGI.id]: '#d60808',
 	[PETS.DEMI_BAHAMUT.id]: '#218cd6',
+	[PETS.DEMI_PHOENIX.id]: '#ff6a00',
 }
+
+const IFRIT_AOE_CAPABLE_ACTIONS = [
+	ACTIONS.FLAMING_CRUSH.id,
+	ACTIONS.INFERNO.id,
+]
 
 const TITAN_WARN_PERCENT = 5
 
+const WIND_BLADE_RECAST = 3000
+const SLIPSTREAM_TICKS = 6 //5 from duration + 1 on cast
+const SLIPSTREAM_TICK_SPEED = 3000
+
+const SLIPSTREAM_SEVERITY = {
+	1: SEVERITY.MINOR,
+	[SLIPSTREAM_TICKS]: SEVERITY.MEDIUM,
+	[2 * SLIPSTREAM_TICKS]: SEVERITY.MAJOR,
+}
+
 // Durations should probably be ACTIONS data
-export const SUMMON_BAHAMUT_LENGTH = 20000
+export const DEMI_SUMMON_LENGTH = 20000
 
 // noPetUptime severity, in %
 const NO_PET_SEVERITY = {
@@ -41,10 +58,19 @@ const NO_PET_SEVERITY = {
 	5: SEVERITY.MAJOR,
 }
 
+// Garuda-Egi single target severity, in %
+// To avoid triggering a message from the occasional single hit on the
+// last enemy in a group, the minimum warning level is set to 10%.
+const GARUDA_ST_SEVERITY = {
+	10: SEVERITY.MINOR,
+	33: SEVERITY.MEDIUM,
+}
+
 export default class Pets extends Module {
 	static handle = 'pets'
-	static i18n_id = i18nMark('smn.pets.title')
+	static title = t('smn.pets.title')`Pets`
 	static dependencies = [
+		'statistics',
 		'suggestions',
 	]
 	static displayOrder = DISPLAY_ORDER.PETS
@@ -53,7 +79,11 @@ export default class Pets extends Module {
 	_currentPet = null
 	_history = []
 
-	_lastSummonBahamut = -1
+	_lastSummonDemi = -1
+
+	_slipstreams = []
+	_badWindBlades = 0
+	_ifritMultiHits = 0
 
 	_petUptime = new Map()
 
@@ -61,9 +91,13 @@ export default class Pets extends Module {
 		super(...args)
 		this.addHook('init', this._onInit)
 		this.addHook('cast', {by: 'player'}, this._onCast)
+		this.addHook('aoedamage', {by: 'pet'}, this._onPetDamage)
+		// TODO: This event hook needs to be revisited once we have the ability to hook arbitrary timestamps.
 		this.addHook('all', this._onEvent)
 		this.addHook('summonpet', this._onChangePet)
-		this.addHook('death', {to: 'pet'}, this._onPetDeath)
+		// Hook changed from on pet death to on player death due to pet changes in Shadowbringers
+		// Pets now won't die unless their caster dies, so FFLogs API no longer emitting pet death events
+		this.addHook('death', {to: 'player'}, this._onDeath)
 		this.addHook('complete', this._onComplete)
 	}
 
@@ -79,7 +113,8 @@ export default class Pets extends Module {
 				continue
 			}
 
-			const action = getAction(event.ability.guid)
+			const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+			if (!action) { continue }
 
 			// I mean this shouldn't happen but people are stupid.
 			// If there's a summon cast before any pet action, they didn't start with a pet.
@@ -119,29 +154,58 @@ export default class Pets extends Module {
 			return
 		}
 
-		// If it's bahamut, we need to handle the timer
-		if (petId === PETS.DEMI_BAHAMUT.id) {
-			this._lastSummonBahamut = event.timestamp
+		// If it's a demi, we need to handle the timer
+		if (this.isDemiPet(petId)) {
+			this._lastSummonDemi = event.timestamp
 		}
 
 		this.setPet(petId)
+	}
+
+	_onPetDamage(event) {
+		const abilityId = event.ability.guid
+
+		if (abilityId === ACTIONS.WIND_BLADE.id &&
+			event.hits.length < 2) {
+			this._badWindBlades++
+		} else if (abilityId === ACTIONS.SLIPSTREAM.id) {
+			this._slipstreams.push({
+				cast: event,
+				ticks: [],
+			})
+		} else if (abilityId === STATUSES.GALE_ENFORCER.id) {
+			// if a Gale Enforcer tick happens without a recorded Slipstream, synthesize one here
+			if (!this._slipstreams.length) {
+				this._slipstreams.push({
+					cast: event,
+					ticks: [],
+				})
+			}
+			this._slipstreams[this._slipstreams.length - 1].ticks.push(event)
+		} else if (
+			IFRIT_AOE_CAPABLE_ACTIONS.includes(abilityId) &&
+			event.hits.length > 1
+		) {
+			this._ifritMultiHits++
+		}
 	}
 
 	_onEvent(event) {
 		if (
 			(this._lastPet || this.parser.byPlayerPet(event)) &&
 			this._currentPet &&
-			this._currentPet.id === PETS.DEMI_BAHAMUT.id &&
-			this._lastSummonBahamut + SUMMON_BAHAMUT_LENGTH <= event.timestamp
+			this.isDemiPet(this._currentPet.id) &&
+			this._lastSummonDemi + DEMI_SUMMON_LENGTH <= event.timestamp
 		) {
 			let petId = null
 			if (this._lastPet) {
 				petId = this._lastPet.id
 			} else {
-				petId = getAction(event.ability.guid).pet
+				const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+				petId = action ? action.pet : undefined
 			}
 
-			this.setPet(petId, this._lastSummonBahamut + SUMMON_BAHAMUT_LENGTH)
+			this.setPet(petId, this._lastSummonDemi + DEMI_SUMMON_LENGTH)
 		}
 	}
 
@@ -163,7 +227,7 @@ export default class Pets extends Module {
 		}
 	}
 
-	_onPetDeath() {
+	_onDeath() {
 		this.setPet(NO_PET_ID)
 	}
 
@@ -181,49 +245,55 @@ export default class Pets extends Module {
 		const value = (this._petUptime.get(id) || 0) + end - start
 		this._petUptime.set(id, value)
 
-		// Work out the party comp
-		// TODO: Should this be in the parser?
-		const roles = this.parser.fightFriendlies.reduce((roles, friendly) => {
-			const job = JOBS[friendly.type]
-			if (!job) { return roles }
+		// Check ticks of Slipstream to detect cases where it was used against adds that died
+		// or where a new pet (including demis) was summoned before the end of the duration
+		const missedTicks = this._slipstreams.reduce((acc, cur) => {
+			const tickCount = cur.ticks.length
+			const possibleTicks = Math.min(SLIPSTREAM_TICKS, Math.floor((this.parser.fight.end_time - cur.cast.timestamp) / SLIPSTREAM_TICK_SPEED))
 
-			roles[job.role] = (roles[job.role] || 0) + 1
-			return roles
-		}, {})
+			return acc + (possibleTicks - Math.min(possibleTicks, tickCount))
+		}, 0)
 
-		// Pet suggestions based on party comp
-		// TODO: This does not account for invuln periods
-		const numCasters = roles[ROLES.MAGICAL_RANGED.id]
-		const mostUsedPet = Array.from(this._petUptime.keys()).sort(
-			(a, b) => this._petUptime.get(b) - this._petUptime.get(a)
-		)[0]
+		this.suggestions.add(new TieredSuggestion({
+			icon: ACTIONS.SLIPSTREAM.icon,
+			tiers: SLIPSTREAM_SEVERITY,
+			value: missedTicks,
+			content: <Trans id="smn.pets.suggestions.slipstream-ticks.content">
+				Ensure you use <ActionLink {...ACTIONS.SLIPSTREAM} /> such that it can deal damage for its entire duration.
+				Summoning another pet or recasting Slipstream will prevent any remaining ticks of a cast.
+			</Trans>,
+			why: <Trans id="smn.pets.suggestions.slipstream-ticks.why">
+				<Plural value={missedTicks} one="# missed tick" other="# missed ticks" /> of Slipstream.
+			</Trans>,
+		}))
 
-		if (numCasters > 1 && mostUsedPet !== PETS.GARUDA_EGI.id) {
-			this.suggestions.add(new Suggestion({
-				icon: ACTIONS.SUMMON.icon,
-				severity: SEVERITY.MEDIUM,
-				content: <Trans id="smn.pets.suggestions.prefer-garuda.content">
-					You should be primarily using Garuda-Egi when in parties with casters other than yourself - they will benefit from <ActionLink {...ACTIONS.CONTAGION}/>'s Magic Vulnerability Up.
-				</Trans>,
-				why: <Trans id="smn.pets.suggestions.prefer-garuda.why">
-					{this.getPetUptimePercent(mostUsedPet)}% {this.getPetName(mostUsedPet)} uptime, Garuda-Egi preferred.
-				</Trans>,
-			}))
-		}
+		// Ensure Garuda is being used in AoE
+		const garudaStPercent = Math.min(100, (((this._badWindBlades * WIND_BLADE_RECAST) / this._petUptime.get(PETS.GARUDA_EGI.id)) * 100))
+		this.suggestions.add(new TieredSuggestion({
+			icon: ACTIONS.SUMMON.icon,
+			tiers: GARUDA_ST_SEVERITY,
+			value: garudaStPercent,
+			content: <Trans id="smn.pets.suggestions.garuda-st.content">
+				Garuda-Egi should only be used for AoE.  Use Ifrit-Egi instead when only a single target is available, as it will deal more damage.
+			</Trans>,
+			why: <Trans id="smn.pets.suggestions.garuda-st.why">
+				Garuda-Egi was attacking a single target {garudaStPercent.toFixed(0)}% of the time it was active.
+			</Trans>,
+		}))
 
-		// Disabling ifrit check post-4.4 due to changes made to RS
-		const currentPatch = getPatch(this.parser.parseDate)
-		const pre44 = PATCHES[currentPatch].date < PATCHES['4.4'].date
-
-		if (pre44 && numCasters === 1 && mostUsedPet !== PETS.IFRIT_EGI.id) {
+		// Since Ifrit's EA2 and Enkindle hit AoE, we can sometimes tell that
+		// it was used in an AoE situation, but we can't tell any more often than
+		// when those particular skills are used.  Therefore, just list this as Medium
+		// rather than trying to determine a percentage like we did with Garuda.
+		if (this._ifritMultiHits > 0) {
 			this.suggestions.add(new Suggestion({
 				icon: ACTIONS.SUMMON_III.icon,
 				severity: SEVERITY.MEDIUM,
-				content: <Trans id="smn.pets.suggestions.prefer-ifrit.content">
-					You should be primarily using Ifrit-Egi when there are no other casters in the party - Ifrit's raw damage and <ActionLink {...ACTIONS.RADIANT_SHIELD}/> provide more than Garuda can bring to the table in these scenarios.
+				content: <Trans id="smn.pets.suggestions.ifrit-aoe.content">
+					Ifrit-Egi should only be used for single target.  Use Garuda-Egi instead when multiple targets are available, as it will deal more damage.
 				</Trans>,
-				why: <Trans id="smn.pets.suggestions.prefer-ifrit.why">
-					{this.getPetUptimePercent(mostUsedPet)}% {this.getPetName(mostUsedPet)} uptime, Ifrit-Egi preferred.
+				why: <Trans id="smn.pets.suggestions.ifrit-aoe.why">
+					Ifrit-Egi hit multiple targets with <Plural value={this._ifritMultiHits} one="# use" other="# uses" /> of <ActionLink {...ACTIONS.FLAMING_CRUSH} /> or <ActionLink {...ACTIONS.INFERNO} />.
 				</Trans>,
 			}))
 		}
@@ -235,7 +305,7 @@ export default class Pets extends Module {
 				icon: ACTIONS.SUMMON_II.icon,
 				severity: SEVERITY.MAJOR,
 				content: <Trans id="smn.pets.suggestions.titan.content">
-					Titan-Egi generally should not be used in party content. Switch to Ifrit-Egi, or Garuda-Egi if you have multiple casters.
+					Titan-Egi generally should not be used in party content. Switch to Ifrit-Egi or Garuda-Egi instead.
 				</Trans>,
 				why: <Trans id="smn.pets.suggestions.titan.why">
 					{titanUptimePercent}% Titan-Egi uptime.
@@ -255,6 +325,26 @@ export default class Pets extends Module {
 			why: <Trans id="smn.pets.suggestions.no-pet.why">
 				No pet summoned for {noPetUptimePercent}% of the fight (&lt;1% is recommended).
 			</Trans>,
+		}))
+
+		// Statistic
+		const uptimeKeys = Array.from(this._petUptime.keys())
+		const data = uptimeKeys.map(id => {
+			const value = this._petUptime.get(id)
+			return {
+				value,
+				color: CHART_COLOURS[id],
+				columns: [
+					this.getPetName(id),
+					this.parser.formatDuration(value),
+					this.getPetUptimePercent(id) + '%',
+				],
+			}
+		})
+
+		this.statistics.add(new PieChartStatistic({
+			headings: ['Pet', 'Uptime', '%'],
+			data,
 		}))
 	}
 
@@ -276,7 +366,7 @@ export default class Pets extends Module {
 			return null
 		}
 
-		return PETS[this._currentPet.id]
+		return getDataBy(PETS, 'id', this._currentPet.id)
 	}
 
 	getPetName(petId) {
@@ -284,34 +374,11 @@ export default class Pets extends Module {
 			return 'No pet'
 		}
 
-		return PETS[petId].name
+		return getDataBy(PETS, 'id', petId).name
 	}
 
-	output() {
-		const uptimeKeys = Array.from(this._petUptime.keys())
-
-		const data = uptimeKeys.map(id => {
-			const value = this._petUptime.get(id)
-			return {
-				value,
-				label: this.getPetName(id),
-				backgroundColor: CHART_COLOURS[id],
-				additional: [
-					this.parser.formatDuration(value),
-					this.getPetUptimePercent(id) + '%',
-				],
-			}
-		})
-
-		return <PieChartWithLegend
-			headers={{
-				label: 'Pet',
-				additional: [
-					'Uptime',
-					'%',
-				],
-			}}
-			data={data}
-		/>
+	isDemiPet(petId) {
+		return petId === PETS.DEMI_BAHAMUT.id || petId === PETS.DEMI_PHOENIX.id
 	}
+
 }

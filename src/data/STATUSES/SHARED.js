@@ -1,4 +1,11 @@
 export default {
+	UNKNOWN: {
+		id: 0,
+		name: 'Unknown',
+		// System action - red background, gold cross
+		icon: 'https://xivapi.com/i/000000/000026.png',
+	},
+
 	WEAKNESS: {
 		id: 43,
 		name: 'Weakness',
@@ -17,21 +24,15 @@ export default {
 		icon: 'https://xivapi.com/i/016000/016203.png',
 	},
 
-	SLASHING_RESISTANCE_DOWN: {
-		id: 819,
-		name: 'Slashing Resistance Down',
-		icon: 'https://xivapi.com/i/015000/015786.png',
-	},
-
-	BLUNT_RESISTANCE_DOWN: {
-		id: 821,
-		name: 'Blunt Resistance Down',
-		icon: 'https://xivapi.com/i/015000/015064.png',
-	},
-
 	WELL_FED: {
 		id: 48,
 		name: 'Well Fed',
 		icon: 'https://xivapi.com/i/016000/016202.png',
+	},
+
+	SQUADRON_RATIONING_MANUAL: {
+		id: 1084,
+		name: 'Squadron Rationing Manual',
+		icon: 'https://xivapi.com/i/016000/016508.png',
 	},
 }

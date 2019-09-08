@@ -2,12 +2,13 @@ import {Trans, Plural} from '@lingui/react'
 import React from 'react'
 
 import {ActionLink} from 'components/ui/DbLink'
-import ACTIONS, {getAction} from 'data/ACTIONS'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import Module from 'parser/core/Module'
 import {Suggestion, TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
 
 const TA_COOLDOWN_MILLIS = ACTIONS.TRICK_ATTACK.cooldown * 1000
-const OPTIMAL_GCD_COUNT = 5 // Number of GCDs prior to the first TA in the opener
+const OPTIMAL_GCD_COUNT = 3 // Number of GCDs prior to the first TA in the opener
 
 export default class TrickAttackUsage extends Module {
 	static handle = 'taUsage'
@@ -29,8 +30,8 @@ export default class TrickAttackUsage extends Module {
 	}
 
 	_onCast(event) {
-		const action = getAction(event.ability.guid)
-		if (action.onGcd) {
+		const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+		if (action && action.onGcd) {
 			this._gcdCount++
 		}
 	}
@@ -65,9 +66,8 @@ export default class TrickAttackUsage extends Module {
 				</Trans>,
 				value: lostCasts,
 				tiers: {
-					1: SEVERITY.MINOR,
-					2: SEVERITY.MEDIUM,
-					3: SEVERITY.MAJOR,
+					1: SEVERITY.MEDIUM,
+					2: SEVERITY.MAJOR,
 				},
 				why: <Trans id="nin.ta-usage.suggestions.missed.why">
 					You delayed Trick Attack for a cumulative {this.parser.formatDuration(this._lostTime)}, costing you <Plural value={lostCasts} one="# potential use" other="# potential uses"/>.
@@ -78,7 +78,7 @@ export default class TrickAttackUsage extends Module {
 			this.suggestions.add(new TieredSuggestion({
 				icon: ACTIONS.TRICK_ATTACK.icon,
 				content: <Trans id="nin.ta-usage.suggestions.opener.content">
-					Avoid unconventional timings for your first <ActionLink {...ACTIONS.TRICK_ATTACK}/> of the fight in order to line it up with all the other raid and personal buffs. In most openers, Trick Attack should be weaved in after {OPTIMAL_GCD_COUNT} GCDs.
+					Avoid unconventional timings for your first <ActionLink {...ACTIONS.TRICK_ATTACK}/> of the fight in order to line it up with all the other raid and personal buffs. In most openers, Trick Attack should be weaved in approximately 10 seconds into the fight.
 				</Trans>,
 				value: distanceFromOptimal,
 				tiers: {

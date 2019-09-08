@@ -2,7 +2,6 @@ import About from './About'
 import AdditionalEvents from './AdditionalEvents'
 import AlwaysBeCasting from './AlwaysBeCasting'
 import AoE from './AoE'
-import Arcanum from './Arcanum'
 import BrokenLog from './BrokenLog'
 import ChangeLog from './ChangeLog'
 import CastTime from './CastTime'
@@ -13,16 +12,17 @@ import Cooldowns from './Cooldowns'
 import Death from './Death'
 import Downtime from './Downtime'
 import Enemies from './Enemies'
+import {FFLogsEventNormaliser} from './FFLogsEventNormaliser'
 import GlobalCooldown from './GlobalCooldown'
 import HitType from './HitType'
 import Invulnerability from './Invulnerability'
-import Potions from './Potions'
 import PrecastAction from './PrecastAction'
 import PrecastStatus from './PrecastStatus'
 import RaidBuffs from './RaidBuffs'
+import Speedmod from './Speedmod'
+import {Statistics} from './Statistics'
 import Suggestions from './Suggestions'
 import Timeline from './Timeline'
-import Speedmod from './Speedmod'
 import UnableToAct from './UnableToAct'
 import Weaving from './Weaving'
 
@@ -31,7 +31,6 @@ export default [
 	AdditionalEvents,
 	AlwaysBeCasting,
 	AoE,
-	Arcanum,
 	BrokenLog,
 	ChangeLog,
 	CastTime,
@@ -42,16 +41,17 @@ export default [
 	Death,
 	Downtime,
 	Enemies,
+	FFLogsEventNormaliser,
 	GlobalCooldown,
 	HitType,
 	Invulnerability,
-	Potions,
 	PrecastAction,
 	PrecastStatus,
 	RaidBuffs,
+	Speedmod,
+	Statistics,
 	Suggestions,
 	Timeline,
-	Speedmod,
 	UnableToAct,
 	Weaving,
 ]

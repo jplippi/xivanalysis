@@ -1,13 +1,17 @@
 import ResourceSimulator from './ResourceSimulator'
-import GCDs from './GCDs'
-import Buffs from './Buffs'
-import DarkArts from './DarkArts'
-import Speedmod from './Speedmod'
+import Cooldowns from './Cooldowns'
+import OGCDDowntime from './OGCDDowntime'
+import Darkside from './Darkside'
+import BloodWeapon from './BloodWeapon'
+import Delirium from './Delirium'
+import MultiHitSkills from './MultiHitSkills'
 
 export default [
+	Darkside,
+	BloodWeapon,
+	Delirium,
 	ResourceSimulator,
-	Speedmod,
-	GCDs,
-	Buffs,
-	DarkArts,
+	Cooldowns,
+	OGCDDowntime,
+	MultiHitSkills,
 ]

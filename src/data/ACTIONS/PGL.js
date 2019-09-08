@@ -1,3 +1,5 @@
+import STATUSES from 'data/STATUSES'
+
 // Split between PGL and MNK
 export default {
 	// -----
@@ -9,6 +11,7 @@ export default {
 		name: 'Bootshine',
 		icon: 'https://xivapi.com/i/000000/000208.png',
 		onGcd: true,
+		potency: 150,
 	},
 
 	TRUE_STRIKE: {
@@ -16,7 +19,7 @@ export default {
 		name: 'True Strike',
 		icon: 'https://xivapi.com/i/000000/000209.png',
 		onGcd: true,
-		potency: 180,
+		potency: 240,
 	},
 
 	SNAP_PUNCH: {
@@ -31,7 +34,7 @@ export default {
 		name: 'Twin Snakes',
 		icon: 'https://xivapi.com/i/000000/000213.png',
 		onGcd: true,
-		potency: 130,
+		potency: 170,
 	},
 
 	ARM_OF_THE_DESTROYER: {
@@ -52,13 +55,6 @@ export default {
 	// Player OGCDs
 	// -----
 
-	INTERNAL_RELEASE: {
-		id: 59,
-		name: 'Internal Release',
-		icon: 'https://xivapi.com/i/000000/000212.png',
-		cooldown: 60,
-	},
-
 	FISTS_OF_EARTH: {
 		id: 60,
 		name: 'Fists of Earth',
@@ -73,31 +69,19 @@ export default {
 		cooldown: 3,
 	},
 
-	STEEL_PEAK: {
-		id: 64,
-		name: 'Steel Peak',
-		icon: 'https://xivapi.com/i/002000/002530.png',
-		cooldown: 40,
-	},
-
 	MANTRA: {
 		id: 65,
 		name: 'Mantra',
 		icon: 'https://xivapi.com/i/000000/000216.png',
 		cooldown: 90,
-	},
-
-	HOWLING_FIST: {
-		id: 67,
-		name: 'Howling Fist',
-		icon: 'https://xivapi.com/i/000000/000207.png',
-		cooldown: 60,
+		statusesApplied: [STATUSES.MANTRA],
 	},
 
 	PERFECT_BALANCE: {
 		id: 69,
 		name: 'Perfect Balance',
 		icon: 'https://xivapi.com/i/000000/000217.png',
-		cooldown: 60,
+		cooldown: 120,
+		statusesApplied: [STATUSES.PERFECT_BALANCE],
 	},
 }

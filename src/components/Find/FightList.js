@@ -1,48 +1,44 @@
-import PropTypes from 'prop-types'
-import React, {Component, Fragment} from 'react'
-import {connect} from 'react-redux'
-import {Checkbox, Header, Icon, Menu} from 'semantic-ui-react'
 import {Trans} from '@lingui/react'
-
+import {getCorrectedFight, getZoneBanner} from 'data/BOSSES'
+import {observer} from 'mobx-react'
+import React, {Component, Fragment} from 'react'
+import {Checkbox, Header, Icon, Menu} from 'semantic-ui-react'
+import {StoreContext} from 'store'
 import FightItem from './FightItem'
-import ZONES from 'data/ZONES'
-import {refreshReport, updateSettings} from 'store/actions'
-
 import styles from './FightList.module.css'
 
+@observer
 class FightList extends Component {
-	static propTypes = {
-		report: PropTypes.shape({
-			fights: PropTypes.arrayOf(PropTypes.shape({
-				id: PropTypes.number.isRequired,
-			})).isRequired,
-		}).isRequired,
-		dispatch: PropTypes.func.isRequired,
-		killsOnly: PropTypes.bool,
-	}
+	static contextType = StoreContext
 
 	refreshFights = () => {
-		this.props.dispatch(refreshReport())
+		const {reportStore} = this.context
+		reportStore.refreshReport()
+	}
+
+	onToggleKillsOnly = (_, data) => {
+		const {settingsStore} = this.context
+		settingsStore.setViewKillsOnly(data.checked)
 	}
 
 	render() {
 		const {
-			dispatch,
-			report,
-		} = this.props
+			reportStore,
+			settingsStore,
+		} = this.context
 
-		let killsOnly = this.props.killsOnly
-		if (killsOnly === undefined) {
-			killsOnly = true
-		}
+		const report = reportStore.report
 
 		// Build a 2d array, grouping fights by the zone they take place in
 		const fights = []
-		let lastZone = null
+		let lastZone
 
 		const trashFights = []
 
-		report.fights && report.fights.forEach(fight => {
+		report.fights && report.fights.forEach(rawFight => {
+			// Run corrections on the data
+			const fight = getCorrectedFight(rawFight)
+
 			// Group all trash together in case they want to see it
 			if (fight.boss === 0) {
 				trashFights.push(fight)
@@ -50,7 +46,7 @@ class FightList extends Component {
 			}
 
 			// Filter out wipes if we're filtering
-			if (killsOnly && !fight.kill) {
+			if (settingsStore.killsOnly && !fight.kill) {
 				return
 			}
 
@@ -58,7 +54,7 @@ class FightList extends Component {
 			if (fight.zoneID !== lastZone) {
 				fights.push({
 					zone: {
-						...ZONES[fight.zoneID],
+						id: fight.zoneID,
 						name: fight.zoneName,
 					},
 					fights: [],
@@ -73,15 +69,12 @@ class FightList extends Component {
 		// If there are any trash fights, add them in now
 		if (trashFights.length) {
 			fights.push({
-				zone: {
-					...ZONES._TRASH,
-					name: <Trans id="core.find.trash">Trash</Trans>,
-				},
+				zone: {name: <Trans id="core.find.trash">Trash</Trans>},
 				fights: trashFights,
 			})
 		}
 
-		return <>
+		return <div className={styles.fightList}>
 			<Header>
 				<Trans id="core.find.select-pull">
 					Select a pull
@@ -90,11 +83,8 @@ class FightList extends Component {
 					<Checkbox
 						toggle
 						label={<label><Trans id="core.find.kills-only">Kills only</Trans></label>}
-						defaultChecked={killsOnly}
-						onChange={(_, data) => dispatch(updateSettings({
-							fightListKillsOnly: data.checked,
-						}))}
-						// className="pull-right"
+						defaultChecked={settingsStore.killsOnly}
+						onChange={this.onToggleKillsOnly}
 					/>
 					<span className={styles.refresh} onClick={this.refreshFights}>
 						<Icon name="refresh"/>
@@ -109,11 +99,11 @@ class FightList extends Component {
 				<Header
 					attached="top"
 					inverted
-					className={group.zone.banner && styles.groupHeader}
+					className={group.zone.id && styles.groupHeader}
 				>
-					{group.zone.banner && <div
+					{group.zone.id && <div
 						className={styles.groupHeaderBackground}
-						style={{backgroundImage: `url(${group.zone.banner})`}}
+						style={{backgroundImage: `url(${getZoneBanner(group.zone.id)})`}}
 					/>}
 					{group.zone.name}
 				</Header>
@@ -121,10 +111,8 @@ class FightList extends Component {
 					{group.fights.map(fight => <FightItem key={fight.id} fight={fight} code={report.code}/>)}
 				</Menu>
 			</Fragment>)}
-		</>
+		</div>
 	}
 }
 
-export default connect(state => ({
-	killsOnly: state.settings.fightListKillsOnly,
-}))(FightList)
+export default FightList

@@ -5,6 +5,10 @@ import Kaiten from './Kaiten'
 import Kenki from './Kenki'
 import Sen from './Sen'
 import Speedmod from './Speedmod'
+import Meikyo from './Meikyo'
+import ThirdEye from './ThirdEye'
+import Tsubame from './Tsubame'
+import OGCDDowntime from './OGCDDowntime'
 
 export default [
 	Buffs,
@@ -14,4 +18,8 @@ export default [
 	Kenki,
 	Sen,
 	Speedmod,
+	Meikyo,
+	ThirdEye,
+	Tsubame,
+	OGCDDowntime,
 ]

@@ -1,5 +1,6 @@
 import React from 'react'
 
+import {getDataBy} from 'data'
 import STATUSES from 'data/STATUSES'
 import JOBS from 'data/JOBS'
 import Module from 'parser/core/Module'
@@ -10,20 +11,23 @@ const RAID_BUFFS = {
 	[STATUSES.THE_BALANCE.id]: {group: 'arcanum', name: 'Arcanum'},
 	[STATUSES.THE_ARROW.id]: {group: 'arcanum', name: 'Arcanum'},
 	[STATUSES.THE_SPEAR.id]: {group: 'arcanum', name: 'Arcanum'},
+	[STATUSES.THE_BOLE.id]: {group: 'arcanum', name: 'Arcanum'},
+	[STATUSES.THE_EWER.id]: {group: 'arcanum', name: 'Arcanum'},
+	[STATUSES.THE_SPIRE.id]: {group: 'arcanum', name: 'Arcanum'},
+	[STATUSES.LORD_OF_CROWNS.id]: {group: 'arcanum', name: 'Arcanum'},
+	[STATUSES.LADY_OF_CROWNS.id]: {group: 'arcanum', name: 'Arcanum'},
+	[STATUSES.DIVINATION.id]: {},
 	[STATUSES.BATTLE_LITANY.id]: {},
 	[STATUSES.BATTLE_VOICE.id]: {exclude: [JOBS.BARD.logType]},
-	[STATUSES.MEDITATIVE_BROTHERHOOD.id]: {},
+	[STATUSES.BROTHERHOOD.id]: {},
 	[STATUSES.CHAIN_STRATAGEM.id]: {},
-	// [STATUSES.CRITICAL_UP.id]: {} // this should be up 100% - worth putting in here?
 	[STATUSES.EMBOLDEN_PHYSICAL.id]: {}, // phys only?
-	[STATUSES.FOE_REQUIEM_DEBUFF.id]: {},
-	[STATUSES.HYPERCHARGE_VULNERABILITY_UP.id]: {name: 'Hypercharge'},
 	[STATUSES.LEFT_EYE.id]: {exclude: [JOBS.DRAGOON.logType]}, // notDRG
 	[STATUSES.TRICK_ATTACK_VULNERABILITY_UP.id]: {name: 'Trick Attack'},
-	// [STATUSES.RADIANT_SHIELD_PHYSICAL_VULNERABILITY_UP.id]: {},
-	[STATUSES.RADIANT_SHIELD.id]: {},
-	[STATUSES.CONTAGION_MAGIC_VULNERABILITY_UP.id]: {name: 'Contagion'},
 	[STATUSES.DEVOTION.id]: {},
+	[STATUSES.TECHNICAL_FINISH.id]: {},
+	[STATUSES.STANDARD_FINISH_PARTNER.id]: {},
+	[STATUSES.DEVILMENT.id]: {},
 }
 
 export default class RaidBuffs extends Module {
@@ -84,7 +88,8 @@ export default class RaidBuffs extends Module {
 		// Generate an item for the buff
 		// TODO: startTime should probably be automated inside timeline
 		const startTime = this.parser.fight.start_time
-		const status = STATUSES[statusId]
+		const status = getDataBy(STATUSES, 'id', statusId)
+		if (!status) { return }
 		buffs[statusId] = new Item({
 			type: 'background',
 			start: event.timestamp - startTime,

@@ -3,8 +3,10 @@ import ACTIONS from 'data/ACTIONS'
 
 const JUMPS = [
 	ACTIONS.JUMP.id,
+	ACTIONS.HIGH_JUMP.id,
 	ACTIONS.SPINESHATTER_DIVE.id,
 	ACTIONS.DRAGONFIRE_DIVE.id,
+	ACTIONS.STARDIVER.id,
 ]
 
 export default class Weaving extends CoreWeaving {

@@ -1,5 +1,6 @@
-import ACTIONS, {getAction} from 'data/ACTIONS'
-import STATUSES, {getStatus} from 'data/STATUSES'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
+import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
 import React from 'react'
 import {Group, Item} from 'parser/core/modules/Timeline'
@@ -80,6 +81,21 @@ export default class Procs extends Module {
 		this.timeline.addGroup(this._group) // Group for showing procs on the timeline
 	}
 
+	getGroupIdForStatus(status) {
+		const groupId = 'procbuffs-' + status.id
+
+		// Make sure a timeline group exists for this buff
+		if (!this._group.nestedGroups.includes(groupId)) {
+			this.timeline.addGroup(new Group({
+				id: groupId,
+				content: status.name,
+			}))
+			this._group.nestedGroups.push(groupId)
+		}
+
+		return groupId
+	}
+
 	_onLoseProc(event) {
 		this._stopAndSave(event.ability.guid, event.timestamp)
 	}
@@ -108,7 +124,8 @@ export default class Procs extends Module {
 		const actionId = event.ability.guid
 
 		// Skip proc checking if we had a corresponding begincast event or the begincast we recorded isn't the same as this spell (ie. cancelled a cast, used a proc)
-		if (getAction(actionId).onGcd && (!this._castingSpellId || this._castingSpellId !== actionId)) {
+		const action = getDataBy(ACTIONS, 'id', actionId)
+		if (action && action.onGcd && (!this._castingSpellId || this._castingSpellId !== actionId)) {
 			this._tryConsumeProc(event)
 		}
 
@@ -127,7 +144,7 @@ export default class Procs extends Module {
 		// If this proc is active, consume it
 		if (this._buffWindows[statusId].current) {
 			// Procs have 0 cast time
-			this.castTime.set([actionId], 0, event.timestamp, event.imestamp)
+			this.castTime.set([actionId], 0, event.timestamp, event.timestamp)
 			// Set overrideAction if we're tracking it for this spell
 			if (ACTION_PROCS[actionId]) {
 				event.ability.overrideAction = ACTION_PROCS[actionId]
@@ -169,8 +186,8 @@ export default class Procs extends Module {
 
 	_onComplete() {
 		PROC_BUFFS.forEach(buff => {
-			const status = getStatus(buff)
-			const groupId = 'procbuffs-' + status.id
+			const status = getDataBy(STATUSES, 'id', buff)
+			const groupId = this.getGroupIdForStatus(status)
 			const fightStart = this.parser.fight.start_time
 
 			// Finalise the buff if it was still active
@@ -178,14 +195,6 @@ export default class Procs extends Module {
 				this._stopAndSave(buff)
 			}
 
-			// Make sure a timeline group exists for this buff
-			if (!this._group.nestedGroups.includes(groupId)) {
-				this.timeline.addGroup(new Group({
-					id: groupId,
-					content: status.name,
-				}))
-				this._group.nestedGroups.push(groupId)
-			}
 			// Add buff windows to the timeline
 			this._buffWindows[buff].history.forEach(window => {
 				this.timeline.addItem(new Item({

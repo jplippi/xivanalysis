@@ -31,11 +31,16 @@ jobs:
           at: /tmp
       - run:
           name: Lint
-          # I love how tslint needs its hand help with making directories
+          # I love how tslint needs its hand held with making directories
           command: |
             yarn lint:js --format junit -o reports/eslint/results.xml
             mkdir -p reports/tslint
             yarn lint:ts --format junit -o reports/tslint/results.xml
+      - run:
+          name: Ensure extract
+          command: |
+            chmod +x .circleci/check-extract.sh
+            ./.circleci/check-extract.sh
       - store_test_results:
           path: reports
 
@@ -76,11 +81,20 @@ jobs:
       - attach_workspace:
           at: /tmp
       - run:
+          name: Set up environment
+          command: |
+            echo 'export BUILD_ID="$CIRCLE_BRANCH.$CIRCLE_SHA1"' >> $BASH_ENV
+      - run:
+          name: Prepare payload
+          command: |
+            mv build $BUILD_ID
+            tar -czf $BUILD_ID.tgz $BUILD_ID
+      - run:
           name: Upload build
-          command: scp -4 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -r build/* $SSH_USER@$SSH_HOST:${DEPLOY_FOLDER}client/deploy-cache
+          command: scp -4 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $BUILD_ID.tgz $SSH_USER@$SSH_HOST:${DEPLOY_FOLDER}client/deploy-cache
       - run:
           name: Run deploy script
-          command: ssh -4 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $SSH_USER@$SSH_HOST "cd ${DEPLOY_FOLDER}client && ./deploy.sh $CIRCLE_SHA1"
+          command: ssh -4 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $SSH_USER@$SSH_HOST "cd ${DEPLOY_FOLDER}client && ./deploy.sh $CIRCLE_BRANCH $CIRCLE_SHA1"
       - run:
           name: Success webhook
           command: |
@@ -100,7 +114,9 @@ workflows:
       - setup:
           filters:
             branches:
-              ignore: i18n-master
+              ignore:
+                - i18n-master
+                - i18n-stormblood
       - lint:
           requires:
             - setup
@@ -113,7 +129,9 @@ workflows:
             - test
           filters:
             branches:
-              only: master
+              only:
+                - master
+                - stormblood
       - deploy:
           requires:
             - build

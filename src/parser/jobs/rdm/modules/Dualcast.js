@@ -1,13 +1,15 @@
+import {t} from '@lingui/macro'
+import {Trans, Plural} from '@lingui/react'
 import React, {Fragment} from 'react'
 import {Accordion} from 'semantic-ui-react'
 import {ActionLink, StatusLink} from 'components/ui/DbLink'
 import Rotation from 'components/ui/Rotation'
-import ACTIONS, {getAction} from 'data/ACTIONS'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
 import {TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
 import {CAST_TYPE, CORRECT_GCDS} from 'parser/jobs/rdm/modules/DualCastEnums'
-import {i18nMark, Trans, Plural} from '@lingui/react'
 
 //const util = require('util')
 
@@ -18,8 +20,7 @@ export default class DualCast extends Module {
 		'downtime',
 		'suggestions',
 	]
-	static title = 'Dualcast'
-	static i18n_id = i18nMark('rdm.dualcast.title')
+	static title = t('rdm.dualcast.title')`Dualcast`
 	//Default CastState
 	_castType = CAST_TYPE.HardCast
 	//Used to 0 out CastTimes
@@ -64,7 +65,8 @@ export default class DualCast extends Module {
 		//TODO: Handle HardCast opener for thunder/areo properly
 		//TODO: Scatter and target counts?
 		const abilityID = event.ability.guid
-		const castTime = getAction(abilityID).castTime
+		const action = getDataBy(ACTIONS, 'id', abilityID)
+		const castTime = action? action.castTime : 0
 		const invuln = this.downtime.getDowntime(this._castTypeLastChanged||0, event.timestamp)
 		//console.log('Invuln:' + invuln)
 		//console.log(`Cast: ${event.ability.name}, timestamp: ${this.parser.formatTimestamp(event.timestamp)}`)
@@ -119,7 +121,7 @@ export default class DualCast extends Module {
 			this.suggestions.add(new TieredSuggestion({
 				icon: STATUSES.DUALCAST.icon,
 				content: <Trans id="rdm.dualcast.suggestions.wasted.content">
-					Spells used while <StatusLink {...STATUSES.DUALCAST}/> is up should be limited to <ActionLink {...ACTIONS.VERAREO}/>, <ActionLink {...ACTIONS.VERTHUNDER}/>, or <ActionLink {...ACTIONS.VERRAISE}/>
+					Spells used while <StatusLink {...STATUSES.DUALCAST}/> is up should be limited to <ActionLink {...ACTIONS.VERAERO}/>, <ActionLink {...ACTIONS.VERTHUNDER}/>, or <ActionLink {...ACTIONS.VERRAISE}/>
 				</Trans>,
 				tiers: this._severityWastedDualcast,
 				value: this._wastedDualCasts,

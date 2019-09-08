@@ -1,11 +1,12 @@
-import {Trans, i18nMark} from '@lingui/react'
+import {t} from '@lingui/macro'
+import {Trans} from '@lingui/react'
 import React from 'react'
 import {Accordion} from 'semantic-ui-react'
 
 import {ActionLink} from 'components/ui/DbLink'
 import Rotation from 'components/ui/Rotation'
-import ACTIONS, {getAction} from 'data/ACTIONS'
-import STATUSES from 'data/STATUSES'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import Module from 'parser/core/Module'
 import {Suggestion, TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
 
@@ -13,15 +14,12 @@ import DISPLAY_ORDER from './DISPLAY_ORDER'
 
 const CORRECT_GCDS = [
 	ACTIONS.RUIN_III.id,
-	ACTIONS.RUIN_IV.id,
-	ACTIONS.TRI_BIND.id,
+	ACTIONS.OUTBURST.id,
 ]
 
-const DWT_LENGTH = 16000
-const OGCD_LENGTH = 750
-// Taking off three ogcd lengths - DWT to open, the final R3, and DF to close
-// eslint-disable-next-line no-magic-numbers
-const USABLE_LENGTH = DWT_LENGTH - OGCD_LENGTH * 3
+const DWT_CAST_TIME_MOD = -2.5
+
+export const DWT_LENGTH = 15000
 
 // Suggestion severity
 const BAD_GCD_SEVERITY = {
@@ -30,24 +28,16 @@ const BAD_GCD_SEVERITY = {
 	6: SEVERITY.MAJOR,
 }
 
-const MISSED_GCD_SEVERITY = {
-	1: SEVERITY.MINOR,
-	10: SEVERITY.MEDIUM,
-}
-
 export default class DWT extends Module {
 	static handle = 'dwt'
-	static i18n_id = i18nMark('smn.dwt.title')
 	static dependencies = [
 		// Ensure AoE runs cleanup before us
-		'aoe', // eslint-disable-line xivanalysis/no-unused-dependencies
+		'aoe', // eslint-disable-line @xivanalysis/no-unused-dependencies
 		'castTime',
-		'downtime',
 		'gauge',
-		'gcd',
 		'suggestions',
 	]
-	static title = 'Dreadwyrm Trance'
+	static title = t('smn.dwt.title')`Dreadwyrm Trance`
 	static displayOrder = DISPLAY_ORDER.DWT
 
 	_active = false
@@ -56,7 +46,6 @@ export default class DWT extends Module {
 
 	_ctIndex = null
 
-	_missedGcds = 0
 	_missedDeathflares = 0
 
 	constructor(...args) {
@@ -69,12 +58,10 @@ export default class DWT extends Module {
 			abilityId: ACTIONS.DEATHFLARE.id,
 		}, this._onDeathflareDamage)
 
-		const dwtBuffFilter = {
-			by: 'player',
-			abilityId: STATUSES.DREADWYRM_TRANCE.id,
-		}
-		this.addHook('applybuff', dwtBuffFilter, this._onApplyDwt)
-		this.addHook('removebuff', dwtBuffFilter, this._onRemoveDwt)
+		this.addHook('death', {to: 'player'}, () => {
+			if (!this._active) { return }
+			this._dwt.died = true
+		})
 
 		this.addHook('complete', this._onComplete)
 	}
@@ -88,12 +75,17 @@ export default class DWT extends Module {
 		}
 
 		// Only going to save casts during DWT
-		if (!this._active || getAction(actionId).autoAttack) {
+		const action = getDataBy(ACTIONS, 'id', actionId)
+		if (!this._active || !action || action.autoAttack) {
 			return
 		}
 
-		// Save the event to the DWT casts
-		this._dwt.casts.push(event)
+		if (event.timestamp - this._dwt.start > DWT_LENGTH)	{
+			this._stopAndSave(0)
+		} else {
+			// Save the event to the DWT casts
+			this._dwt.casts.push(event)
+		}
 	}
 
 	_onDeathflareDamage(event) {
@@ -123,10 +115,10 @@ export default class DWT extends Module {
 		let badGcds = 0
 		this._history.forEach(dwt => {
 			badGcds += dwt.casts
-				.filter(cast =>
-					getAction(cast.ability.guid).onGcd &&
-					!CORRECT_GCDS.includes(cast.ability.guid)
-				)
+				.filter(cast => {
+					const action = getDataBy(ACTIONS, 'id', cast.ability.guid)
+					return action && action.onGcd && !CORRECT_GCDS.includes(action.id)
+				})
 				.length
 		})
 
@@ -135,30 +127,13 @@ export default class DWT extends Module {
 			this.suggestions.add(new TieredSuggestion({
 				icon: ACTIONS.DREADWYRM_TRANCE.icon,
 				content: <Trans id="smn.dwt.suggestions.bad-gcds.content">
-					GCDs used during Dreadwyrm Trance should be limited to <ActionLink {...ACTIONS.RUIN_III}/> and <ActionLink {...ACTIONS.RUIN_IV}/>, or <ActionLink {...ACTIONS.TRI_BIND}/> in AoE situations.
+					GCDs used during Dreadwyrm Trance should be limited to <ActionLink {...ACTIONS.RUIN_III}/> in single target or <ActionLink {...ACTIONS.OUTBURST}/> in AoE situations.
 				</Trans>,
 				why: <Trans id="smn.dwt.suggestions.bad-gcds.why">
 					{badGcds} incorrect GCDs used during DWT.
 				</Trans>,
 				tiers: BAD_GCD_SEVERITY,
 				value: badGcds,
-			}))
-		}
-
-		if (this._missedGcds) {
-			// Grabbing the full possible gcd count for suggestion text
-			const possibleGcds = Math.floor(USABLE_LENGTH / this.gcd.getEstimate()) + 1
-
-			this.suggestions.add(new Suggestion({
-				icon: ACTIONS.DREADWYRM_TRANCE.icon,
-				content: <Trans id="smn.dwt.suggestions.missed-gcds.content">
-					You can fit <strong>{possibleGcds}</strong> GCDs in each <ActionLink {...ACTIONS.DREADWYRM_TRANCE}/> at your GCD. In general, don't end DWT early. Exceptions include: the boss is about to become invulnerable/die, <ActionLink {...ACTIONS.AETHERFLOW}/> is ready, or <ActionLink {...ACTIONS.DEATHFLARE}/> will cleave multiple targets.
-				</Trans>,
-				why: <Trans id="smn.dwt.suggestions.missed-gcds.why">
-					{this._missedGcds} additional GCDs could have been used during DWT.
-				</Trans>,
-				tiers: MISSED_GCD_SEVERITY,
-				value: this._missedGcds,
 			}))
 		}
 
@@ -182,10 +157,11 @@ export default class DWT extends Module {
 			start,
 			end: null,
 			rushing: this.gauge.isRushing(),
+			died: false,
 			casts: [],
 		}
 
-		this._ctIndex = this.castTime.set([ACTIONS.RUIN_III.id], 0)
+		this._ctIndex = this.castTime.set('all', DWT_CAST_TIME_MOD)
 	}
 
 	_stopAndSave(dfHits, endTime = this.parser.currentTimestamp) {
@@ -201,27 +177,10 @@ export default class DWT extends Module {
 		this.castTime.reset(this._ctIndex)
 
 		// ...don't miss deathflare k
-		if (dfHits === 0) {
+		// Don't flag if they died, the death suggestion is morbid enough.
+		if (dfHits === 0 && !this._dwt.died) {
 			this._missedDeathflares ++
 		}
-
-		// If they're rushing, don't fault them for short DWTs
-		// Even a single additional hit makes a 0-gcd dwt worth it :eyes:
-		if (this.gauge.isRushing() || dfHits > 1) {
-			return
-		}
-
-		// Don't want to fault people for 'missing' gcds when they can't actually cast
-		const invulnTime = this.downtime.getDowntime(this._dwt.start, this._dwt.start + DWT_LENGTH)
-
-		// The last gcd only needs to fit the instant cast in, hence the +1
-		const possibleGcds = Math.floor((USABLE_LENGTH - invulnTime) / this.gcd.getEstimate()) + 1
-
-		// Check the no. GCDs actually cast
-		const gcds = this._dwt.casts.filter(cast => getAction(cast.ability.guid).onGcd)
-
-		// Eyy, got there. Save out the details for now.
-		this._missedGcds += Math.max(0, possibleGcds - gcds.length)
 	}
 
 	activeAt(time) {
@@ -235,7 +194,10 @@ export default class DWT extends Module {
 
 	output() {
 		const panels = this._history.map(dwt => {
-			const numGcds = dwt.casts.filter(cast => getAction(cast.ability.guid).onGcd).length
+			const numGcds = dwt.casts.filter(cast => {
+				const action = getDataBy(ACTIONS, 'id', cast.ability.guid)
+				return action && action.onGcd
+			}).length
 			const noDeathflare = dwt.casts.filter(cast => cast.ability.guid === ACTIONS.DEATHFLARE.id).length === 0
 			return {
 				key: dwt.start,
@@ -243,8 +205,15 @@ export default class DWT extends Module {
 					content: <>
 						{this.parser.formatTimestamp(dwt.start)}
 						&nbsp;-&nbsp;{numGcds} GCDs
-						{dwt.rushing && <span className="text-info">&nbsp;(rushing)</span>}
-						{noDeathflare && <span className="text-error">&nbsp;(no Deathflare)</span>}
+						{dwt.rushing && <>
+							&nbsp;<Trans id="smn.dwt.rushing" render="span" className="text-info">(rushing)</Trans>
+						</>}
+						{noDeathflare && !dwt.died && <>
+							&nbsp;<Trans id="smn.dwt.no-deathflare" render="span" className="text-error">(no Deathflare)</Trans>
+						</>}
+						{dwt.died && <>
+							&nbsp;<Trans id="smn.dwt.died" render="span" className="text-error">(died)</Trans>
+						</>}
 					</>,
 				},
 				content: {

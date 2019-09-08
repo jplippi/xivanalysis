@@ -1,9 +1,56 @@
+import STATUSES from 'data/STATUSES'
+
 export default {
+	TEMPERANCE: {
+		id: 16536,
+		name: 'Temperance',
+		icon: 'https://xivapi.com/i/002000/002645.png',
+		cooldown: 120,
+		statusesApplied: [STATUSES.TEMPERANCE],
+	},
+
+	AFFLATUS_MISERY: {
+		id: 16535,
+		name: 'Afflatus Misery',
+		icon: 'https://xivapi.com/i/002000/002644.png',
+		onGcd: true,
+	},
+
+	AFFLATUS_RAPTURE: {
+		id: 16534,
+		name: 'Afflatus Rapture',
+		icon: 'https://xivapi.com/i/002000/002643.png',
+		onGcd: true,
+	},
+
+	AFFLATUS_SOLACE: {
+		id: 16531,
+		name: 'Afflatus Solace',
+		icon: 'https://xivapi.com/i/002000/002640.png',
+		onGcd: true,
+	},
+
+	DIA: {
+		id: 16532,
+		name: 'Dia',
+		icon: 'https://xivapi.com/i/002000/002641.png',
+		onGcd: true,
+	},
+
+	GLARE: {
+		id: 16533,
+		name: 'Glare',
+		icon: 'https://xivapi.com/i/002000/002642.png',
+		onGcd: true,
+		castTime: 2.5,
+	},
+
 	PLENARY_INDULGENCE: {
 		id: 7433,
 		name: 'Plenary Indulgence',
 		icon: 'https://xivapi.com/i/002000/002639.png',
 		cooldown: 60,
+		statusesApplied: [STATUSES.CONFESSION],
 	},
 
 	STONE_IV: {
@@ -19,15 +66,13 @@ export default {
 		name: 'Tetragrammaton',
 		icon: 'https://xivapi.com/i/002000/002633.png',
 		cooldown: 60,
-		//affected by lilies
 	},
 
 	ASSIZE: {
 		id: 3571,
 		name: 'Assize',
 		icon: 'https://xivapi.com/i/002000/002634.png',
-		cooldown: 60,
-		//affected by lilies
+		cooldown: 45,
 	},
 
 	ASYLUM: {
@@ -35,7 +80,7 @@ export default {
 		name: 'Asylum',
 		icon: 'https://xivapi.com/i/002000/002632.png',
 		cooldown: 60,
-		//affected by lilies
+		statusesApplied: [STATUSES.ASYLUM],
 	},
 
 	BENEDICTION: {
@@ -58,6 +103,7 @@ export default {
 		name: 'Presence of Mind',
 		icon: 'https://xivapi.com/i/002000/002626.png',
 		cooldown: 150,
+		statusesApplied: [STATUSES.PRESENCE_OF_MIND],
 	},
 
 	STONE_III: {
@@ -73,6 +119,7 @@ export default {
 		name: 'Divine Benison',
 		icon: 'https://xivapi.com/i/002000/002638.png',
 		cooldown: 30,
+		statusesApplied: [STATUSES.DIVINE_BENISON],
 	},
 
 	THIN_AIR: {
@@ -80,6 +127,7 @@ export default {
 		name: 'Thin Air',
 		icon: 'https://xivapi.com/i/002000/002636.png',
 		cooldown: 120,
+		statusesApplied: [STATUSES.THIN_AIR],
 	},
 
 	AERO_III: {
@@ -95,7 +143,8 @@ export default {
 		name: 'Medica II',
 		icon: 'https://xivapi.com/i/000000/000409.png',
 		onGcd: true,
-		castTime: 3,
+		castTime: 2.5,
+		statusesApplied: [STATUSES.MEDICA_II],
 	},
 
 	//the following abilities are to be moved to CNJ.js
@@ -128,6 +177,7 @@ export default {
 		name: 'Regen',
 		icon: 'https://xivapi.com/i/002000/002628.png',
 		onGcd: true,
+		statusesApplied: [STATUSES.REGEN],
 	},
 
 	FLUID_AURA: {
@@ -188,6 +238,6 @@ export default {
 		name: 'Cure',
 		icon: 'https://xivapi.com/i/000000/000405.png',
 		onGcd: true,
-		castTime: 2,
+		castTime: 1.5,
 	},
 }

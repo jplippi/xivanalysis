@@ -1,10 +1,12 @@
-import {Trans, Plural, i18nMark} from '@lingui/react'
+import {t} from '@lingui/macro'
+import {Trans, Plural} from '@lingui/react'
 import React from 'react'
 import {Accordion, Message} from 'semantic-ui-react'
 
 import {ActionLink} from 'components/ui/DbLink'
 import Rotation from 'components/ui/Rotation'
-import ACTIONS, {getAction} from 'data/ACTIONS'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import Module from 'parser/core/Module'
 
 const VALID_ROTATIONS = [
@@ -59,8 +61,7 @@ const GCD_LENGTH = 2500
 
 export default class RotationWatchdog extends Module {
 	static handle = 'rotation'
-	static i18n_id = i18nMark('drg.rotation.title')
-	static title = 'Rotational Issues'
+	static title = t('drg.rotation.title')`Rotational Issues`
 	static dependencies = [
 		'downtime',
 	]
@@ -76,8 +77,8 @@ export default class RotationWatchdog extends Module {
 	}
 
 	_onCast(event) {
-		const action = getAction(event.ability.guid)
-		if (!action.onGcd) {
+		const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+		if (!action || !action.onGcd) {
 			return
 		}
 

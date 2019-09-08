@@ -1,3 +1,5 @@
+import STATUSES from 'data/STATUSES'
+
 export default {
 	// -----
 	// Player GCDs
@@ -7,13 +9,6 @@ export default {
 		id: 70,
 		name: 'Rockbreaker',
 		icon: 'https://xivapi.com/i/002000/002529.png',
-		onGcd: true,
-	},
-
-	ONE_ILM_PUNCH: {
-		id: 72,
-		name: 'One-Ilm Punch',
-		icon: 'https://xivapi.com/i/000000/000214.png',
 		onGcd: true,
 	},
 
@@ -39,6 +34,21 @@ export default {
 		cooldown: 1.2,
 	},
 
+	FOUR_POINT_FURY: {
+		id: 16473,
+		name: 'Four-Point Fury',
+		icon: 'https://xivapi.com/i/002000/002544.png',
+		onGcd: true,
+	},
+
+	SIX_SIDED_STAR: {
+		id: 16476,
+		name: 'Six-Sided Star',
+		icon: 'https://xivapi.com/i/002000/002547.png',
+		onGcd: true,
+		cooldown: 5,
+	},
+
 	// -----
 	// Player OGCDs
 	// -----
@@ -61,7 +71,7 @@ export default {
 		id: 3547,
 		name: 'The Forbidden Chakra',
 		icon: 'https://xivapi.com/i/002000/002535.png',
-		cooldown: 5,
+		cooldown: 1,
 	},
 
 	ELIXIR_FIELD: {
@@ -69,13 +79,6 @@ export default {
 		name: 'Elixir Field',
 		icon: 'https://xivapi.com/i/002000/002533.png',
 		cooldown: 30,
-	},
-
-	PURIFICATION: {
-		id: 3544,
-		name: 'Purification',
-		icon: 'https://xivapi.com/i/002000/002532.png',
-		cooldown: 120,
 	},
 
 	TORNADO_KICK: {
@@ -90,27 +93,7 @@ export default {
 		name: 'Riddle of Earth',
 		icon: 'https://xivapi.com/i/002000/002537.png',
 		cooldown: 60,
-	},
-
-	EARTH_TACKLE: {
-		id: 7864,
-		name: 'Earth Tackle',
-		icon: 'https://xivapi.com/i/002000/002538.png',
-		cooldown: 30,
-	},
-
-	RIDDLE_OF_WIND: {
-		id: 7868,
-		name: 'Riddle of Wind',
-		icon: 'https://xivapi.com/i/002000/002543.png',
-		cooldown: 0,
-	},
-
-	WIND_TACKLE: {
-		id: 7865,
-		name: 'Wind Tackle',
-		icon: 'https://xivapi.com/i/002000/002539.png',
-		cooldown: 30,
+		statusesApplied: [STATUSES.RIDDLE_OF_EARTH],
 	},
 
 	RIDDLE_OF_FIRE: {
@@ -118,13 +101,7 @@ export default {
 		name: 'Riddle of Fire',
 		icon: 'https://xivapi.com/i/002000/002541.png',
 		cooldown: 90,
-	},
-
-	FIRE_TACKLE: {
-		id: 7866,
-		name: 'Fire Tackle',
-		icon: 'https://xivapi.com/i/002000/002540.png',
-		cooldown: 30,
+		statusesApplied: [STATUSES.RIDDLE_OF_FIRE],
 	},
 
 	BROTHERHOOD: {
@@ -132,5 +109,21 @@ export default {
 		name: 'Brotherhood',
 		icon: 'https://xivapi.com/i/002000/002542.png',
 		cooldown: 90,
+		statusesApplied: [STATUSES.BROTHERHOOD, STATUSES.MEDITATIVE_BROTHERHOOD],
+	},
+
+	ENLIGHTENMENT: {
+		id: 16474,
+		name: 'Enlightenment',
+		icon: 'https://xivapi.com/i/002000/002545.png',
+		cooldown: 1,
+	},
+
+	ANATMAN: {
+		id: 16475,
+		name: 'Anatman',
+		icon: 'https://xivapi.com/i/002000/002546.png',
+		cooldown: 60,
+		statusesApplied: [STATUSES.ANATMAN],
 	},
 }

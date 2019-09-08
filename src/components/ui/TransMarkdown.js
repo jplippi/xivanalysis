@@ -20,28 +20,30 @@ const LINK_TYPES = {
 		term,
 	}, children),
 
-	action: (actionID, children) => {
-		if (ACTIONS[actionID]) {
-			actionID = ACTIONS[actionID].id
+	action: (actionId, children) => {
+		const action = ACTIONS[actionId]
+		if (action) {
+			actionId = action.id
 		} else {
-			actionID = parseInt(actionID, 10)
+			actionId = parseInt(actionId, 10)
 		}
 
 		return React.createElement(ActionLink, {
-			id: actionID,
+			id: actionId,
 			name: children,
 		})
 	},
 
-	status: (statusID, children) => {
-		if (STATUSES[statusID]) {
-			statusID = STATUSES[statusID].id
+	status: (statusId, children) => {
+		const status = STATUSES[statusId]
+		if (status) {
+			statusId = status.id
 		} else {
-			statusID = parseInt(statusID, 10)
+			statusId = parseInt(statusId, 10)
 		}
 
 		return React.createElement(StatusLink, {
-			id: statusID,
+			id: statusId,
 			name: children,
 		})
 	},
@@ -49,11 +51,17 @@ const LINK_TYPES = {
 
 class TransMarkdown extends PureComponent {
 	static propTypes = {
-		id: PropTypes.string.isRequired,
 		i18n: PropTypes.shape({
 			_: PropTypes.func.isRequired,
 		}),
-		source: PropTypes.string.isRequired,
+		source: PropTypes.oneOfType([
+			PropTypes.string,
+			PropTypes.shape({
+				id: PropTypes.string.isRequired,
+				defaults: PropTypes.string,
+				values: PropTypes.object,
+			}),
+		]).isRequired,
 		renderers: PropTypes.object,
 		linkTarget: PropTypes.string,
 	}
@@ -74,13 +82,13 @@ class TransMarkdown extends PureComponent {
 	}
 
 	render() {
-		const {id, i18n, source, renderers} = this.props
+		const {i18n, source, renderers} = this.props
 
 		// i18n might not be ready yet, load the default as a fallback
-		let finalSource = source
-		if (i18n) {
-			finalSource = i18n._(id, {}, {defaults: source})
-		}
+		// ridiculous .replace because lingui is pants on head and escaped the escape characters.
+		const finalSource = i18n
+			? i18n._(source).replace(/\\`/g, '`')
+			: typeof source === 'string'? source : (source.defaults || '')
 
 		return <ReactMarkdown
 			source={finalSource}

@@ -1,5 +1,3 @@
-import {AxiosRequestConfig} from 'axios'
-
 // -----
 // Fight
 // -----
@@ -43,6 +41,7 @@ export enum ActorType {
 	PALADIN = 'Paladin',
 	WARRIOR = 'Warrior',
 	DARK_KNIGHT = 'DarkKnight',
+	GUNBREAKER = 'Gunbreaker', // TODO: CONFIRM
 	WHITE_MAGE = 'WhiteMage',
 	SCHOLAR = 'Scholar',
 	ASTROLOGIAN = 'Astrologian',
@@ -52,6 +51,7 @@ export enum ActorType {
 	SAMURAI = 'Samurai',
 	BARD = 'Bard',
 	MACHINIST = 'Machinist',
+	DANCER = 'Dancer', // TODO: CONFIRM
 	BLACK_MAGE = 'BlackMage',
 	SUMMONER = 'Summoner',
 	RED_MAGE = 'RedMage',
@@ -67,11 +67,14 @@ export interface ActorFightInstance {
 	instances?: number,
 }
 
-export interface Actor {
+interface BaseActor {
 	guid: number
 	id: number
 	name: string
 	type: ActorType
+}
+
+export interface Actor extends BaseActor {
 	fights: ActorFightInstance[]
 }
 
@@ -85,7 +88,7 @@ export interface ActorResources {
 	mp: number
 	maxMP: number
 	tp: number
-	maxTp: number
+	maxTP: number
 	x: number
 	y: number
 }
@@ -104,6 +107,23 @@ export enum AbilityType {
 	MAGICAL_DIRECT = 1024,
 }
 
+export enum HitType {
+	MISS = 0,
+	NORMAL = 1,
+	CRITICAL = 2,
+	BLOCK = 4,
+	DODGE = 7,
+	// PARRY = 8, // Seems to be used for other games where parry is a missType?
+	DEFLECT = 9,
+	IMMUNE = 10,
+	MISFIRE = 11,
+	REFLECT = 12,
+	EVADE = 13,
+	RESIST = 14,
+	// TODO: Tentative:
+	PARRY = 20,
+}
+
 export interface Ability {
 	abilityIcon: string
 	guid: number
@@ -111,14 +131,22 @@ export interface Ability {
 	type: AbilityType
 }
 
+// Hell if I know. Seems to be used for 'Environment', and that's about it.
+interface EventActor extends BaseActor {
+	icon: string,
+}
+
 export interface Event {
 	timestamp: number
 	type: string | symbol
 
-	sourceID: number
+	source?: EventActor
+	sourceID?: number
+	sourceInstance?: number
 	sourceIsFriendly: boolean
-	targetID: number
-	targetInstance: number
+	target?: EventActor
+	targetID?: number
+	targetInstance?: number
 	targetIsFriendly: boolean
 }
 
@@ -127,8 +155,7 @@ export interface AbilityEvent extends Event {
 }
 
 interface EffectEvent extends AbilityEvent {
-	// TODO: HitType enum would be nice
-	hitType: number
+	hitType: HitType
 	tick?: boolean
 
 	guessAmount?: number
@@ -151,8 +178,10 @@ export interface DeathEvent extends Event { type: 'death' }
 export interface CastEvent extends AbilityEvent { type: 'begincast' | 'cast' }
 export interface DamageEvent extends EffectEvent {
 	type: 'damage'
+	overkill?: number
 	absorbed: number
 	multistrike?: boolean
+	blocked?: number
 }
 export interface HealEvent extends EffectEvent {
 	type: 'heal'
@@ -179,44 +208,71 @@ export interface BuffStackEvent extends AbilityEvent {
 }
 
 // -----
+// Misc
+// -----
+
+export enum ReportLanguage {
+	JAPANESE = 'ja',
+	ENGLISH = 'en',
+	GERMAN = 'de',
+	FRENCH = 'fr',
+	KOREAN = 'kr',
+	CHINESE = 'cn',
+
+	// ???
+	UNKNOWN = 'unknown',
+}
+
+// -----
 // Direct API
 // -----
 
-export interface ReportFightsQuery extends AxiosRequestConfig {
-	params?: {
-		translate?: boolean,
-	}
+export interface ReportFightsQuery {
+	translate?: boolean,
+	// This is only a thing when hitting an instance of @xivanalysis/server
+	bypassCache?: boolean,
 }
 
-export interface ReportFightsResponse {
+interface SharedReportFightsResponse {
 	end: number
-	enemies: Actor[]
-	enemyPets: Pet[]
-	fights: Fight[]
-	friendlies: Actor[]
-	friendlyPets: Pet[]
-	lang: string
 	owner: string
-	phases: Phase[]
 	start: number
 	title: string
 	zone: number
 }
 
-export interface ReportEventsQuery extends AxiosRequestConfig {
-	params?: {
-		start?: number,
-		end?: number,
-		actorid?: Actor['id'],
-		actorinstance?: number,
-		actorclass?: ActorType,
-		cutoff?: number,
-		encounter?: Fight['boss'],
-		wipes?: number,
-		difficulty?: number,
-		filter?: string,
-		translate?: boolean,
-	}
+interface ProcessingReportFightsResponse extends SharedReportFightsResponse {
+	exportedCharacters: unknown[]
+	processing: true
+}
+
+export interface ProcessedReportFightsResponse extends SharedReportFightsResponse {
+	enemies: Actor[]
+	enemyPets: Pet[]
+	fights: Fight[]
+	friendlies: Actor[]
+	friendlyPets: Pet[]
+	lang: ReportLanguage
+	phases: Phase[]
+	processing?: false
+}
+
+export type ReportFightsResponse =
+	| ProcessingReportFightsResponse
+	| ProcessedReportFightsResponse
+
+export interface ReportEventsQuery {
+	start?: number,
+	end?: number,
+	actorid?: Actor['id'],
+	actorinstance?: number,
+	actorclass?: ActorType,
+	cutoff?: number,
+	encounter?: Fight['boss'],
+	wipes?: number,
+	difficulty?: number,
+	filter?: string,
+	translate?: boolean,
 }
 
 export interface ReportEventsResponse {

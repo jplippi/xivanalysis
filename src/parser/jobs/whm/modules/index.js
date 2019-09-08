@@ -1,15 +1,17 @@
-import Gauge from './Gauge'
+import Assize from './Assize'
 import DoTs from './DoTs'
 import Benison from './Benison'
-import Assize from './Assize'
+import Lilies from './Lilies'
 import Overheal from './Overheal'
 import Speedmod from './Speedmod'
+import Swiftcast from './Swiftcast'
 
 export default [
-	Gauge,
-	Overheal,
-	DoTs,
-	Benison,
 	Assize,
+	Benison,
+	DoTs,
+	Lilies,
+	Overheal,
 	Speedmod,
+	Swiftcast,
 ]

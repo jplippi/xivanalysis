@@ -6,15 +6,16 @@ export default {
 		duration: 20,
 	},
 
-	PIERCING_RESISTANCE_DOWN: {
-		id: 820,
-		name: 'Piercing Resistance Down',
-		icon: 'https://xivapi.com/i/015000/015065.png',
-		duration: 30,
-	},
-
 	RIGHT_EYE: {
 		id: 1453,
+		name: 'Right Eye',
+		icon: 'https://xivapi.com/i/012000/012581.png',
+		duration: 20,
+	},
+
+	// Because apparently Right Eye has a different status ID if you don't have a tether partner. Thanks, SE.
+	RIGHT_EYE_SOLO: {
+		id: 1910,
 		name: 'Right Eye',
 		icon: 'https://xivapi.com/i/012000/012581.png',
 		duration: 20,
@@ -27,10 +28,10 @@ export default {
 		duration: 20,
 	},
 
-	HEAVY_THRUST: {
-		id: 115,
-		name: 'Heavy Thrust',
-		icon: 'https://xivapi.com/i/010000/010306.png',
+	DISEMBOWEL: {
+		id: 1914,
+		name: 'Disembowel',
+		icon: 'https://xivapi.com/i/012000/012576.png',
 		duration: 30,
 	},
 
@@ -48,9 +49,9 @@ export default {
 		duration: 10,
 	},
 
-	BLOOD_FOR_BLOOD: {
-		id: 117,
-		name: 'Blood For Blood',
+	LANCE_CHARGE: {
+		id: 1864,
+		name: 'Lance Charge',
 		icon: 'https://xivapi.com/i/010000/010304.png',
 		duration: 20,
 	},
@@ -59,7 +60,7 @@ export default {
 		id: 118,
 		name: 'Chaos Thrust',
 		icon: 'https://xivapi.com/i/010000/010307.png',
-		duration: 30,
+		duration: 24,
 	},
 
 	DIVE_READY: {
@@ -73,6 +74,13 @@ export default {
 		id: 116,
 		name: 'Life Surge',
 		icon: 'https://xivapi.com/i/010000/010302.png',
+		duration: 5,
+	},
+
+	RAIDEN_THRUST_READY: {
+		id: 1863,
+		name: 'Raiden Thrust Ready',
+		icon: 'https://xivapi.com/i/012000/012584.png',
 		duration: 10,
 	},
 }

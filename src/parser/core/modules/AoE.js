@@ -10,8 +10,6 @@ const DEFAULT_AOE_THRESHOLD = 20
 const STATUS_AOE_THRESHOLD = 200
 
 const SUPPORTED_EVENTS = [
-	'damage',
-	'heal',
 	'refreshbuff',
 	'applybuff',
 ]
@@ -20,9 +18,10 @@ export default class AoE extends Module {
 	static handle = 'aoe'
 	static dependencies = [
 		// Need the precasts to fire first so we've got full info for the aoe calcs
-		'precastAction', // eslint-disable-line xivanalysis/no-unused-dependencies
-		'precastStatus', // eslint-disable-line xivanalysis/no-unused-dependencies
+		'precastAction', // eslint-disable-line @xivanalysis/no-unused-dependencies
+		'precastStatus', // eslint-disable-line @xivanalysis/no-unused-dependencies
 		'enemies',
+		'fflogsEvents',
 	]
 
 	constructor(...args) {
@@ -33,6 +32,9 @@ export default class AoE extends Module {
 
 	// Need to normalise so the final events can go out at the right time
 	normalise(events) {
+		// Determine which name to use for damage and heal events (calculated vs normal)
+		SUPPORTED_EVENTS.push(this.fflogsEvents.damageEventName, this.fflogsEvents.healEventName)
+
 		// Track hits by source
 		const trackers = {}
 		function getTracker(event) {
@@ -155,27 +157,44 @@ export default class AoE extends Module {
 				const key = `${event.targetID}-${event.targetInstance}`
 				if (carry[key]) {
 					carry[key].times++
+					carry[key].amount += event.amount
+					carry[key].successfulHit = carry[key].successfulHit || event.successfulHit
 				} else {
 					carry[key] = {
 						id: event.targetID,
 						instance: event.targetInstance,
 						times: 1,
+						amount: event.amount,
+						successfulHit: event.successfulHit,
 					}
 				}
 				return carry
 			}, {})
 
-			this.parser.fabricateEvent({
-				type: 'aoe' + eventType,
+			const fabricatedEvent = {
+				type: 'aoe' + eventType.replace('calculated', ''),
+				timestamp: event.events[eventType][0].timestamp,
 				ability: event.events[eventType][0].ability,
 				hits: Object.values(hitsByTarget),
 				sourceID: event.events[eventType][0].sourceID,
-			})
+				amount: Object.values(hitsByTarget).reduce((total, hit) => total + hit.amount, 0),
+				successfulHit: Object.values(hitsByTarget).reduce((successfulHit, hit) => successfulHit || hit.successfulHit, false),
+			}
+			if (event.events[eventType][0].hasOwnProperty('sourceResources')) {
+				fabricatedEvent.sourceResources = event.events[eventType][0].sourceResources
+			}
+			this.parser.fabricateEvent(fabricatedEvent)
 		}
 	}
 
 	isValidHit(event) {
 		// Checking the event's target - if we get a falsey value back, it's an invalid target
-		return !!this.enemies.getEntity(event.targetID)
+		const validTarget = !!this.enemies.getEntity(event.targetID)
+
+		// If there's an amount key but it's 0, it was likely a hit on an invuln target
+		// Allow hits w/ overkill, as the fflogs algo for that shit is flakey
+		const zeroAmount = event.amount === 0 && !event.overkill
+
+		return validTarget && !zeroAmount
 	}
 }

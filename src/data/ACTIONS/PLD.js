@@ -1,3 +1,5 @@
+import STATUSES from 'data/STATUSES'
+
 export default {
 	// -----
 	// Player GCDs
@@ -7,66 +9,81 @@ export default {
 		name: 'Fast Blade',
 		icon: 'https://xivapi.com/i/000000/000158.png',
 		onGcd: true,
-	},
-	SAVAGE_BLADE: {
-		id: 11,
-		name: 'Savage Blade',
-		icon: 'https://xivapi.com/i/000000/000157.png',
-		onGcd: true,
-	},
-	FLASH: {
-		id: 14,
-		name: 'Flash',
-		icon: 'https://xivapi.com/i/000000/000159.png',
-		onGcd: true,
+		potency: 200,
+		combo: {
+			start: true,
+		},
 	},
 	RIOT_BLADE: {
 		id: 15,
 		name: 'Riot Blade',
 		icon: 'https://xivapi.com/i/000000/000156.png',
 		onGcd: true,
+		potency: 100,
+		combo: {
+			from: 9,
+			potency: 300,
+		},
 	},
 	SHIELD_LOB: {
 		id: 24,
 		name: 'Shield Lob',
 		icon: 'https://xivapi.com/i/000000/000164.png',
 		onGcd: true,
+		breaksCombo: true,
+		potency: 120,
 	},
 	SHIELD_BASH: {
 		id: 16,
 		name: 'Shield Bash',
 		icon: 'https://xivapi.com/i/000000/000154.png',
 		onGcd: true,
+		breaksCombo: true,
+		potency: 110,
 	},
 	RAGE_OF_HALONE: {
 		id: 21,
 		name: 'Rage Of Halone',
 		icon: 'https://xivapi.com/i/000000/000155.png',
 		onGcd: true,
-	},
-	SHIELD_OATH: {
-		id: 28,
-		name: 'Shield Oath',
-		icon: 'https://xivapi.com/i/002000/002505.png',
-		onGcd: true,
-	},
-	SWORD_OATH: {
-		id: 26,
-		name: 'Sword Oath',
-		icon: 'https://xivapi.com/i/002000/002504.png',
-		onGcd: true,
+		potency: 100,
+		combo: {
+			from: 15,
+			potency: 350,
+			end: true,
+		},
 	},
 	TOTAL_ECLIPSE: {
 		id: 7381,
 		name: 'Total Eclipse',
 		icon: 'https://xivapi.com/i/002000/002511.png',
 		onGcd: true,
+		breaksCombo: true,
+		potency: 110,
+	},
+	PROMINENCE: {
+		id: 16457,
+		name: 'Prominence',
+		icon: 'https://xivapi.com/i/002000/002516.png',
+		onGcd: true,
+		potency: 100,
+		combo: {
+			from: 7381,
+			potency: 220,
+			end: true,
+		},
 	},
 	GORING_BLADE: {
 		id: 3538,
 		name: 'Goring Blade',
 		icon: 'https://xivapi.com/i/002000/002506.png',
 		onGcd: true,
+		potency: 100,
+		combo: {
+			from: 15,
+			potency: 390,
+			end: true,
+		},
 	},
 	CLEMENCY: {
 		id: 3541,
@@ -74,12 +91,19 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002509.png',
 		onGcd: true,
 		castTime: 1.5,
+		breaksCombo: true,
 	},
 	ROYAL_AUTHORITY: {
 		id: 3539,
 		name: 'Royal Authority',
 		icon: 'https://xivapi.com/i/002000/002507.png',
 		onGcd: true,
+		potency: 100,
+		combo: {
+			from: 15,
+			potency: 550,
+			end: true,
+		},
 	},
 	HOLY_SPIRIT: {
 		id: 7384,
@@ -87,6 +111,33 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002514.png',
 		onGcd: true,
 		castTime: 1.5,
+		breaksCombo: true,
+		potency: 350,
+	},
+	HOLY_CIRCLE: {
+		id: 16458,
+		name: 'Holy Circle',
+		icon: 'https://xivapi.com/i/002000/002517.png',
+		onGcd: true,
+		castTime: 1.5,
+		breaksCombo: true,
+		potency: 250,
+	},
+	ATONEMENT: {
+		id: 16460,
+		name: 'Atonement',
+		icon: 'https://xivapi.com/i/002000/002519.png',
+		onGcd: true,
+		breaksCombo: true,
+		potency: 550,
+	},
+	CONFITEOR: {
+		id: 16459,
+		name: 'Confiteor',
+		icon: 'https://xivapi.com/i/002000/002518.png',
+		onGcd: true,
+		breaksCombo: true,
+		potency: 800,
 	},
 
 	// -----
@@ -98,32 +149,19 @@ export default {
 		icon: 'https://xivapi.com/i/000000/000166.png',
 		onGcd: false,
 		cooldown: 60,
+		statusesApplied: [STATUSES.FIGHT_OR_FLIGHT],
 	},
-	SHIELD_SWIPE: {
-		id: 25,
-		name: 'Shield Swipe',
-		icon: 'https://xivapi.com/i/000000/000160.png',
+	IRON_WILL: {
+		id: 28,
+		name: 'Iron Will',
+		icon: 'https://xivapi.com/i/002000/002505.png',
 		onGcd: false,
-		cooldown: 15,
+		cooldown: 10,
 	},
 	SENTINEL: {
 		id: 17,
 		name: 'Sentinel',
 		icon: 'https://xivapi.com/i/000000/000151.png',
-		onGcd: false,
-		cooldown: 180,
-	},
-	TEMPERED_WILL: {
-		id: 19,
-		name: 'Tempered Will',
-		icon: 'https://xivapi.com/i/000000/000153.png',
-		onGcd: false,
-		cooldown: 180,
-	},
-	BULWARK: {
-		id: 22,
-		name: 'Bulwark',
-		icon: 'https://xivapi.com/i/000000/000167.png',
 		onGcd: false,
 		cooldown: 180,
 	},
@@ -189,5 +227,12 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002515.png',
 		onGcd: false,
 		cooldown: 120,
+	},
+	INTERVENE: {
+		id: 16461,
+		name: 'Intervene',
+		icon: 'https://xivapi.com/i/002000/002520.png',
+		onGcd: false,
+		cooldown: 30,
 	},
 }

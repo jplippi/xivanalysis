@@ -9,34 +9,27 @@ export default {
 		id: 107,
 		name: 'Opo-Opo Form',
 		icon: 'https://xivapi.com/i/010000/010212.png',
-		duration: 10000,
+		duration: 15,
 	},
 
 	RAPTOR_FORM: {
 		id: 108,
 		name: 'Raptor Form',
 		icon: 'https://xivapi.com/i/010000/010213.png',
-		duration: 10000,
+		duration: 15,
 	},
 
 	COEURL_FORM: {
 		id: 109,
 		name: 'Coeurl Form',
 		icon: 'https://xivapi.com/i/010000/010214.png',
-		duration: 10000,
+		duration: 15,
 	},
 
 	MANTRA: {
 		id: 102,
 		name: 'Mantra',
 		icon: 'https://xivapi.com/i/010000/010206.png',
-	},
-
-	INTERNAL_RELEASE: {
-		id: 100,
-		name: 'Internal Release',
-		icon: 'https://xivapi.com/i/010000/010204.png',
-		duration: 15,
 	},
 
 	TWIN_SNAKES: {
@@ -59,13 +52,6 @@ export default {
 		icon: 'https://xivapi.com/i/012000/012526.png',
 	},
 
-	RIDDLE_OF_WIND: {
-		id: 1244,
-		name: 'Riddle of Wind',
-		icon: 'https://xivapi.com/i/012000/012530.png',
-		duration: 10,
-	},
-
 	FISTS_OF_EARTH: {
 		id: 104,
 		name: 'Fists of Earth',
@@ -76,6 +62,13 @@ export default {
 		id: 1179,
 		name: 'Riddle of Earth',
 		icon: 'https://xivapi.com/i/012000/012527.png',
+		duration: 30,
+	},
+
+	EARTHS_REPLY: {
+		id: 1180,
+		name: 'Earth\'s Reply',
+		icon: 'https://xivapi.com/i/012000/012531.png',
 		duration: 30,
 	},
 
@@ -92,13 +85,6 @@ export default {
 		duration: 20,
 	},
 
-	EARTHS_REPLY: {
-		id: 1180,
-		name: 'Earth\'s Reply',
-		icon: 'https://xivapi.com/i/012000/012531.png',
-		duration: 30,
-	},
-
 	BROTHERHOOD: {
 		id: 1185,
 		name: 'Brotherhood',
@@ -112,9 +98,9 @@ export default {
 		icon: 'https://xivapi.com/i/012000/012529.png',
 	},
 
-	GREASED_LIGHTNING_I: {
+	GREASED_LIGHTNING: {
 		id: 111,
-		name: 'Greased Lightning I',
+		name: 'Greased Lightning',
 		icon: 'https://xivapi.com/i/010000/010207.png',
 		duration: 16,
 	},
@@ -131,5 +117,26 @@ export default {
 		name: 'Greased Lightning III',
 		icon: 'https://xivapi.com/i/010000/010209.png',
 		duration: 16,
+	},
+
+	GREASED_LIGHTNING_IV: {
+		id: 30000,
+		name: 'Greased Lightning IV',
+		icon: 'https://xivapi.com/i/010000/010207.png',
+		duration: 16,
+	},
+
+	LEADEN_FIST: {
+		id: 1861,
+		name: 'Leaden Fist',
+		icon: 'https://xivapi.com/i/012000/012533.png',
+		duration: 30,
+	},
+
+	ANATMAN: {
+		id: 1862,
+		name: 'Anatman',
+		icon: 'https://xivapi.com/i/012000/012534.png',
+		duration: 30,
 	},
 }

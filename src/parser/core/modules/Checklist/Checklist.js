@@ -1,16 +1,16 @@
+import {t} from '@lingui/macro'
 import React from 'react'
-import {i18nMark} from '@lingui/react'
 
 import Rule from './Rule'
-import ChecklistComponent from 'components/modules/Checklist'
-import Module from 'parser/core/Module'
+import ChecklistComponent from './Component'
+import Module, {DISPLAY_MODE} from 'parser/core/Module'
 import DISPLAY_ORDER from '../DISPLAY_ORDER'
 
 export default class Checklist extends Module {
 	static handle = 'checklist'
+	static title = t('core.checklist.title')`Checklist`
 	static displayOrder = DISPLAY_ORDER.CHECKLIST
-	static i18n_id = i18nMark('core.checklist.title')
-	static title = 'Checklist'
+	static displayMode = DISPLAY_MODE.FULL
 
 	_rules = []
 

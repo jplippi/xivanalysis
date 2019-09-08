@@ -1,3 +1,5 @@
+import STATUSES from 'data/STATUSES'
+
 export default {
 	MAGES_BALLAD: {
 		id: 114,
@@ -6,13 +8,6 @@ export default {
 		onGcd: false,
 		cooldown: 80,
 		potency: 100,
-	},
-	FOE_REQUIEM: {
-		id: 115,
-		name: 'Foe Requiem',
-		icon: 'https://xivapi.com/i/002000/002604.png',
-		onGcd: true,
-		castTime: 1.5,
 	},
 	ARMYS_PAEON: {
 		id: 116,
@@ -28,7 +23,7 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002605.png',
 		onGcd: false,
 		cooldown: 15,
-		potency: 100,
+		potency: 130,
 	},
 	BATTLE_VOICE: {
 		id: 118,
@@ -36,6 +31,7 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002601.png',
 		onGcd: false,
 		cooldown: 180,
+		statusesApplied: [STATUSES.BATTLE_VOICE],
 	},
 	EMPYREAL_ARROW: {
 		id: 3558,
@@ -74,6 +70,7 @@ export default {
 		onGcd: false,
 		cooldown: 60,
 		potency: [100, 175, 260],
+		cooldownGroup: 3562, //Sidewinder Group
 	},
 	PITCH_PERFECT: {
 		id: 7404,
@@ -81,7 +78,7 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002611.png',
 		onGcd: false,
 		cooldown: 3,
-		potency: [100, 240, 420],
+		potency: [100, 250, 450],
 	},
 	TROUBADOUR: {
 		id: 7405,
@@ -89,34 +86,59 @@ export default {
 		icon: 'https://xivapi.com/i/002000/002612.png',
 		onGcd: false,
 		cooldown: 180,
+		statusesApplied: [STATUSES.TROUBADOUR],
 	},
 	CAUSTIC_BITE: {
 		id: 7406,
 		name: 'Caustic Bite',
 		icon: 'https://xivapi.com/i/002000/002613.png',
 		onGcd: true,
-		potency: 120,
+		potency: 150,
 	},
 	STORMBITE: {
 		id: 7407,
 		name: 'Stormbite',
 		icon: 'https://xivapi.com/i/002000/002614.png',
 		onGcd: true,
-		potency: 120,
+		potency: 100,
 	},
 	NATURES_MINNE: {
 		id: 7408,
 		name: 'Nature\'s Minne',
 		icon: 'https://xivapi.com/i/002000/002615.png',
 		onGcd: false,
-		cooldown: 45,
+		cooldown: 90,
+		statusesApplied: [STATUSES.NATURES_MINNE],
 	},
 	REFULGENT_ARROW: {
 		id: 7409,
 		name: 'Refulgent Arrow',
 		icon: 'https://xivapi.com/i/002000/002616.png',
 		onGcd: true,
-		potency: 300,
+		potency: 340,
+	},
+	SHADOWBITE: {
+		id: 16494,
+		name: 'Shadowbite',
+		icon: 'https://xivapi.com/i/002000/002617.png',
+		onGcd: false,
+		cooldown: 60,
+		potency: [100, 160, 220],
+		cooldownGroup: 3562, //Sidewinder Group
+	},
+	BURST_SHOT: {
+		id: 16495,
+		name: 'Burst Shot',
+		icon: 'https://xivapi.com/i/002000/002618.png',
+		onGcd: true,
+		potency: 230,
+	},
+	APEX_ARROW: {
+		id: 16496,
+		name: 'Apex Arow',
+		icon: 'https://xivapi.com/i/002000/002619.png',
+		onGcd: true,
+		potency: 500,
 	},
 }
 

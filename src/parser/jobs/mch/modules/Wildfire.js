@@ -1,32 +1,28 @@
-import {Trans, Plural, i18nMark} from '@lingui/react'
+import {t} from '@lingui/macro'
+import {Trans, Plural} from '@lingui/react'
 import React, {Fragment} from 'react'
 import {Accordion, Message} from 'semantic-ui-react'
 
-import {ActionLink} from 'components/ui/DbLink'
+import {ActionLink, StatusLink} from 'components/ui/DbLink'
 import Rotation from 'components/ui/Rotation'
-import ACTIONS, {getAction} from 'data/ACTIONS'
+import {getDataBy} from 'data'
+import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
 import {TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
 
 const DEBUFF_APPLICATION_BUFFER = 1000 // Buffer for the empty window check, since debuff applications always happen 9 times in the logs for some ungodly reason
 
-const WILDFIRE_DAMAGE_FACTOR = 0.25
-
-const WILDFIRE_GCD_TARGET = 5
-const WILDFIRE_GCD_WARNING = 4
+const WILDFIRE_GCD_TARGET = 6
+const WILDFIRE_GCD_WARNING = 5
 const WILDFIRE_GCD_ERROR = 0
-
-const NON_OVERHEATED_GCD_THRESHOLD = 2
 
 export default class Wildfire extends Module {
 	static handle = 'wildfire'
-	static i18n_id = i18nMark('mch.wildfire.title')
-	static title = 'Wildfire'
+	static title = t('mch.wildfire.title')`Wildfire`
 	static dependencies = [
 		'brokenLog',
 		'enemies',
-		'heat',
 		'suggestions',
 	]
 
@@ -48,22 +44,15 @@ export default class Wildfire extends Module {
 		if (target && target.hasStatus(STATUSES.WILDFIRE.id) && // Target has WF on them
 			this._wildfireWindows.current !== null && // And we're in a WF window (in case there are multiple MCHs)
 			this._wildfireWindows.current.targetId === event.targetID) { // And we're hitting the WF-afflicted target
-			const currentDamage = this._wildfireWindows.current.casts.length > 0 ? this._wildfireWindows.current.casts[this._wildfireWindows.current.casts.length - 1].compoundDamage : 0
-			this._wildfireWindows.current.casts.push({
-				...event,
-				overheated: this.heat.overheated, // Slap this on everything for simplicity, we can ignore it for OGCDs when evaluating
-				compoundDamage: currentDamage + Math.floor(event.amount * WILDFIRE_DAMAGE_FACTOR),
-			})
+			this._wildfireWindows.current.casts.push({...event})
 		}
 	}
 
 	_closeWildfireWindow(damage) {
-		if (damage > 0) {
-			this._wildfireWindows.current.casts = this._wildfireWindows.current.casts.filter(cast => cast.compoundDamage <= damage) // Pop any extraneous events off the end
-		}
-		const gcds = this._wildfireWindows.current.casts.filter(cast => getAction(cast.ability.guid).onGcd)
-		this._wildfireWindows.current.gcdCount = gcds.length
-		this._wildfireWindows.current.overheatedGcdCount = gcds.filter(cast => cast.overheated).length
+		this._wildfireWindows.current.gcdCount = this._wildfireWindows.current.casts.filter(cast => {
+			const action = getDataBy(ACTIONS, 'id', cast.ability.guid)
+			return action && action.onGcd
+		}).length
 		this._wildfireWindows.current.damage = damage
 		this._wildfireWindows.history.push(this._wildfireWindows.current)
 		this._wildfireWindows.current = null
@@ -76,7 +65,11 @@ export default class Wildfire extends Module {
 		} else {
 			// Something fucky this way comes - we got a WF damage event without a corresponding applydebuff, which means the log is probably jank.
 			// Create a fake window so we still display time/damage and notify the "broken log" module.
-			this.brokenLog.trigger()
+			this.brokenLog.trigger(this, 'no buff wf', (
+				<Trans id="mch.wildfire.trigger.no-buff-wf">
+					<ActionLink {...ACTIONS.WILDFIRE}/> damage was recorded without a corresponding <StatusLink {...STATUSES.WILDFIRE}/> debuff.
+				</Trans>
+			))
 			this._wildfireWindows.history.push({
 				spoofed: true,
 				start: event.timestamp - (STATUSES.WILDFIRE.duration * 1000),
@@ -86,32 +79,33 @@ export default class Wildfire extends Module {
 	}
 
 	_onWildfireApplied(event) {
-		if (this._wildfireWindows.current === null) {
-			this._wildfireWindows.current = {
-				start: event.timestamp,
-				casts: [],
-				targetId: event.targetID,
-			}
-		} else if (this._wildfireWindows.current.start + DEBUFF_APPLICATION_BUFFER < event.timestamp) {
+		if (this._wildfireWindows.current && this._wildfireWindows.current.start + DEBUFF_APPLICATION_BUFFER < event.timestamp) {
 			// We have an unfinished WF window; the lack of a damage event to close it implies that it fizzled due to downtime, so track that
 			this._closeWildfireWindow(0)
+		}
+
+		this._wildfireWindows.current = {
+			start: event.timestamp,
+			casts: [],
+			targetId: event.targetID,
 		}
 	}
 
 	_onComplete() {
-		const badWildfires = this._wildfireWindows.history.filter(wildfire => wildfire.gcdCount - wildfire.overheatedGcdCount >= NON_OVERHEATED_GCD_THRESHOLD).length
+		const badWildfires = this._wildfireWindows.history.filter(wildfire => wildfire.gcdCount < WILDFIRE_GCD_TARGET).length
 		this.suggestions.add(new TieredSuggestion({
 			icon: ACTIONS.WILDFIRE.icon,
 			content: <Trans id="mch.wildfire.suggestions.cooldown.content">
-				Try to align your <ActionLink {...ACTIONS.WILDFIRE}/> windows as closely as possible with your overheat windows to maximize damage. Casting Wildfire too early or too late can cost you significant damage gains from heated shots and the 20% damage buff from overheating.
+				Try to ensure you have an Overheat window prepared for every <ActionLink {...ACTIONS.WILDFIRE}/> cast to maximize damage. Each GCD in a Wildfire window is worth 200 potency, so maximizing the GCD count with <ActionLink {...ACTIONS.HEAT_BLAST}/> is important.
 			</Trans>,
 			tiers: {
-				1: SEVERITY.MEDIUM,
-				3: SEVERITY.MAJOR,
+				1: SEVERITY.MINOR,
+				2: SEVERITY.MEDIUM,
+				4: SEVERITY.MAJOR,
 			},
 			value: badWildfires,
 			why: <Trans id="mch.wildfire.suggestions.cooldown.why">
-				{badWildfires} of your Wildfire windows contained at least {NON_OVERHEATED_GCD_THRESHOLD} non-overheated GCDs.
+				{badWildfires} of your Wildfire windows contained fewer than {WILDFIRE_GCD_TARGET} GCDs.
 			</Trans>,
 		}))
 
@@ -119,7 +113,7 @@ export default class Wildfire extends Module {
 		this.suggestions.add(new TieredSuggestion({
 			icon: ACTIONS.WILDFIRE.icon,
 			content: <Trans id="mch.wildfire.suggestions.fizzle.content">
-				Be careful to time your <ActionLink {...ACTIONS.WILDFIRE}/> windows so that the damage resolves during uptime. Wildfire makes up a significant portion of your overall damage, so losing the final burst can cost you a lot.
+				Be careful to time your <ActionLink {...ACTIONS.WILDFIRE}/> windows so that the damage resolves during uptime, or detonate them early if necessary to at least get partial potency.
 			</Trans>,
 			tiers: {
 				1: SEVERITY.MEDIUM,
@@ -194,7 +188,7 @@ export default class Wildfire extends Module {
 
 		return <Fragment>
 			<Message>
-				<Trans id="mch.wildfire.accordion.message">Every <ActionLink {...ACTIONS.WILDFIRE}/> window should ideally contain at least {WILDFIRE_GCD_TARGET} GCDs and as many OGCDs as you can weave. Each Wildfire window below indicates how many GCDs it contained and the total damage it hit for, and will display all the damaging casts in the window if expanded.</Trans>
+				<Trans id="mch.wildfire.accordion.message">Every <ActionLink {...ACTIONS.WILDFIRE}/> window should ideally contain at least {WILDFIRE_GCD_TARGET} GCDs to maximize its potency. Each Wildfire window below indicates how many GCDs it contained and the total damage it hit for, and will display all the damaging casts in the window if expanded.</Trans>
 			</Message>
 			<Accordion
 				exclusive={false}

@@ -1,13 +1,15 @@
 import Aetherflow from './Aetherflow'
-import ClericStance from './ClericStance'
 import DoTs from './DoTs'
-import ShadowFlare from './ShadowFlare'
 import Weaving from './Weaving'
+import ChainStrat from './ChainStrat'
+import FaerieGauge from './FaerieGauge'
+import Swiftcast from './Swiftcast'
 
 export default [
 	Weaving,
 	Aetherflow,
-	ClericStance,
 	DoTs,
-	ShadowFlare,
+	ChainStrat,
+	FaerieGauge,
+	Swiftcast,
 ]

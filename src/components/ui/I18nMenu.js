@@ -1,91 +1,89 @@
 import {Trans} from '@lingui/react'
-import PropTypes from 'prop-types'
+import {LANGUAGES} from 'data/LANGUAGES'
+import {GameEdition} from 'data/PATCHES'
+import {computed} from 'mobx'
+import {observer} from 'mobx-react'
 import React, {Component} from 'react'
-import {connect} from 'react-redux'
-import {Dropdown, Image} from 'semantic-ui-react'
-
-import LANGUAGES, {LANGUAGE_ARRAY} from 'data/LANGUAGES'
-import {setLanguage, toggleI18nOverlay} from 'store/actions'
-
+import {Dropdown, Icon, Image} from 'semantic-ui-react'
+import {StoreContext} from 'store'
 import crowdinLogo from './crowdin-dark-symbol.png'
 import styles from './I18nMenu.module.css'
 
 const DEBUG = process.env.NODE_ENV === 'development'
 
-export class I18nMenu extends Component {
-	static propTypes = {
-		dispatch: PropTypes.func.isRequired,
-		language: PropTypes.string.isRequired,
-		overlay: PropTypes.bool.isRequired,
+@observer
+class I18nMenu extends Component {
+	static contextType = StoreContext
+
+	@computed
+	get availableLanguages() {
+		const {i18nStore} = this.context
+		const currentLanguage = i18nStore.siteLanguage
+		return Object.entries(LANGUAGES)
+			.filter(([lang, data]) => DEBUG || data.enable || currentLanguage === lang)
+			.map(([lang, data]) => ({
+				...data.menu,
+				value: lang,
+				description: ((process.env.LOCALE_COMPLETION || {})[lang] || '0') + '%',
+			}))
 	}
 
-	constructor(props) {
-		super(props)
-
-		this.toggleOverlay = this.toggleOverlay.bind(this)
-		this.handleChange = this.handleChange.bind(this)
-
-		this.state = {
-			currentLanguage: props.language,
-			languages: this.filterLanguages(),
-		}
+	@computed
+	get gameLanguageOptions() {
+		return Object.entries(LANGUAGES)
+			.filter(([, data]) => data.gameEdition === GameEdition.GLOBAL)
+			.map(([lang, data]) => ({
+				...data.menu,
+				value: lang,
+			}))
 	}
 
-	filterLanguages() {
-		const currentLanguage = this.props.language
-		let languages = LANGUAGE_ARRAY
-		if (! DEBUG) {
-			languages = languages.filter(lang => lang.enable || currentLanguage === lang.value)
-		}
-
-		return languages.map(lang => lang.menu)
+	handleChangeSite = (event, data) => {
+		const {i18nStore} = this.context
+		i18nStore.setSiteLanguage(data.value)
 	}
 
-	componentDidUpdate() {
-		if (this.props.language !== this.state.currentLanguage) {
-			this.setState({
-				currentLanguage: this.props.language,
-				languages: this.filterLanguages(),
-			})
-		}
+	handleChangeGame = (event, data) => {
+		const {i18nStore} = this.context
+		i18nStore.setGameLanguage(data.value)
 	}
 
-	handleChange(event, data) {
-		this.props.dispatch(setLanguage(data.value))
-	}
-
-	toggleOverlay() {
-		this.props.dispatch(toggleI18nOverlay())
+	toggleOverlay = () => {
+		const {i18nStore} = this.context
+		i18nStore.toggleOverlay()
 	}
 
 	render() {
-		const {overlay} = this.props
-		const {currentLanguage, languages} = this.state
-		const lang = LANGUAGES[currentLanguage]
+		const {i18nStore} = this.context
+		const siteLang = LANGUAGES[i18nStore.siteLanguage]
+		const gameLang = LANGUAGES[i18nStore.gameLanguage]
 
-		if (languages.length < 2) {
-			return null
-		}
-
-		return <Dropdown
-			className="link item"
-			text={lang ? lang.menu.text : 'Language'}
-		>
-			<Dropdown.Menu>
-				{languages.map(option => <Dropdown.Item
-					key={option.value}
-					active={currentLanguage === option.value}
-					onClick={this.handleChange}
-					{...option}
-					className={styles.menuItem}
-				/>)}
-				<Dropdown.Divider />
-				{DEBUG?
+		return <div className={styles.container}>
+			{/* Site language */}
+			<Dropdown
+				className={styles.dropdown}
+				text={<>
+					<Icon name="globe"/>
+					{siteLang ? siteLang.menu.text : 'Language'}
+				</>}
+			>
+				<Dropdown.Menu>
+					{this.availableLanguages.map(option => <Dropdown.Item
+						key={option.value}
+						active={i18nStore.siteLanguage === option.value}
+						onClick={this.handleChangeSite}
+						{...option}
+						className={styles.menuItem}
+					/>)}
+					<Dropdown.Divider />
 					<Dropdown.Item
 						onClick={this.toggleOverlay}
-						icon={overlay? 'eye slash' : 'eye'}
-						text={overlay ? 'Hide Overlay' : 'Show Overlay'}
-					/> :
+						icon={i18nStore.overlay? 'eye slash' : 'eye'}
+						text={i18nStore.overlay
+							? <Trans id="core.i18n.hide-overlay">Hide i18n overlay</Trans>
+							: <Trans id="core.i18n.show-overlay">Show i18n overlay</Trans>
+						}
+					/>
 					<Dropdown.Item
 						as="a"
 						href="https://crowdin.com/project/xivanalysis"
@@ -93,16 +91,35 @@ export class I18nMenu extends Component {
 					>
 						<Image src={crowdinLogo} className={styles.crowdinLogo}/>
 						<Trans id="core.i18n.help-translate">
-							Help translate!
+								Help translate!
 						</Trans>
 					</Dropdown.Item>
-				}
-			</Dropdown.Menu>
-		</Dropdown>
+				</Dropdown.Menu>
+			</Dropdown>
+
+			{/* Game Language */}
+			<Dropdown
+				className={styles.dropdown}
+				direction="left"
+				text={<>
+					<Icon name="gamepad"/>
+					{gameLang ? gameLang.menu.text : 'Language'}
+				</>}
+			>
+				<Dropdown.Menu>
+					{this.gameLanguageOptions.map(options => (
+						<Dropdown.Item
+							key={options.value}
+							active={i18nStore.gameLanguage === options.value}
+							onClick={this.handleChangeGame}
+							{...options}
+							className={styles.menuItem}
+						/>
+					))}
+				</Dropdown.Menu>
+			</Dropdown>
+		</div>
 	}
 }
 
-export default connect(state => ({
-	language: state.language.site,
-	overlay: state.i18nOverlay,
-}))(I18nMenu)
+export default I18nMenu

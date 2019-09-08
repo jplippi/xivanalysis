@@ -1,3 +1,5 @@
+import STATUSES from 'data/STATUSES'
+
 export default {
 	// -----
 	// Cooldowns
@@ -7,33 +9,45 @@ export default {
 		name: 'Embolden',
 		icon: 'https://xivapi.com/i/003000/003218.png',
 		cooldown: 120,
+		statusesApplied: [STATUSES.EMBOLDEN_MAGIC, STATUSES.EMBOLDEN_PHYSICAL],
 	},
 	ACCELERATION: {
 		id: 7518,
 		name: 'Acceleration',
 		icon: 'https://xivapi.com/i/003000/003214.png',
 		cooldown: 35,
+		statusesApplied: [STATUSES.ACCELERATION],
 	},
 	MANAFICATION: {
 		id: 7521,
 		name: 'Manafication',
 		icon: 'https://xivapi.com/i/003000/003219.png',
-		cooldown: 120,
+		cooldown: 110,
 		breaksCombo: true,
+		statusesApplied: [STATUSES.MANAFICATION],
 	},
 	CONTRE_SIXTE: {
 		id: 7519,
 		name: 'Contre Sixte',
 		icon: 'https://xivapi.com/i/003000/003217.png',
-		cooldown: 45,
-		potency: 300, //Note 2nd enemy takes 10% less, 3rd 20%, 4th 30%, 5th 40%, and beyond 50%
+		cooldown: 35,
+		potency: 300, //Note 2nd enemy and others takes 50% less
 	},
 	DISPLACEMENT: {
 		id: 7515,
 		name: 'Displacement',
 		icon: 'https://xivapi.com/i/003000/003211.png',
 		cooldown: 35,
-		potency: 130,
+		potency: 200,
+		cooldownGroup: 10,
+	},
+	ENGAGEMENT: {
+		id: 16527,
+		name: 'Engagement',
+		icon: 'https://xivapi.com/i/003000/003231.png',
+		cooldown: 35,
+		potency: 150,
+		cooldownGroup: 10,
 	},
 	CORPS_A_CORPS: {
 		id: 7506,
@@ -124,17 +138,32 @@ export default {
 			potency: 470,
 		},
 	},
+	REPRISE: {
+		id: 16529,
+		name: 'Reprise',
+		icon: 'https://xivapi.com/i/003000/003233.png',
+		onGcd: true,
+		cooldown: 2.5,
+		potency: 100,
+	},
+	ENCHANTED_REPRISE: {
+		id: 16528,
+		name: 'Enchanted Reprise',
+		icon: 'https://xivapi.com/i/003000/003232.png',
+		onGcd: true,
+		cooldown: 2.2,
+		potency: 220, //consumes 10 white, 10 black
+	},
 	VERFLARE: {
 		id: 7525,
 		name: 'Verflare',
 		icon: 'https://xivapi.com/i/003000/003223.png',
 		onGcd: true,
 		cooldown: 2.5,
-		potency: 550, //Gains 21 Black Mana, if Black is lower 100% Verfire ready
+		potency: 600, //Gains 21 Black Mana, if Black is lower 100% Verfire ready
 		combo: {
 			from: 7529,
-			potency: 550,
-			end: true,
+			potency: 600,
 		},
 	},
 	VERHOLY: {
@@ -143,10 +172,22 @@ export default {
 		icon: 'https://xivapi.com/i/003000/003224.png',
 		onGcd: true,
 		cooldown: 2.5,
-		potency: 550, //Gains 21 white, if White is lower 100% Verstone ready
+		potency: 600, //Gains 21 white, if White is lower 100% Verstone ready
 		combo: {
 			from: 7529,
-			potency: 550,
+			potency: 600,
+		},
+	},
+	SCORCH: {
+		id: 16530,
+		name: 'Scorch',
+		icon: 'https://xivapi.com/i/003000/003234.png',
+		onGcd: true,
+		cooldown: 2.5,
+		potency: 700, //Gains 7 white and black
+		combo: {
+			from: [7525, 7526],
+			potency: 700,
 			end: true,
 		},
 	},
@@ -167,17 +208,27 @@ export default {
 		onGcd: true,
 		cooldown: 2.5,
 		castTime: 2,
-		potency: 240, //Increase White and Black by 3
+		potency: 250, //Increase White and Black by 3
 		breaksCombo: true,
 	},
+	// IMPACT: {
+	// 	id: 7522,
+	// 	name: 'Impact',
+	// 	icon: 'https://xivapi.com/i/003000/003222.png',
+	// 	onGcd: true,
+	// 	cooldown: 2.5,
+	// 	castTime: 5,
+	// 	potency: 220, //Increase White and Black by 3
+	// 	breaksCombo: true,
+	// },
 	IMPACT: {
-		id: 7522,
+		id: 16526,
 		name: 'Impact',
 		icon: 'https://xivapi.com/i/003000/003222.png',
 		onGcd: true,
 		cooldown: 2.5,
-		castTime: 2,
-		potency: 270, //Increase White and Black by 4
+		castTime: 5,
+		potency: 250, //Increase White and Black by 3
 		breaksCombo: true,
 	},
 	VERTHUNDER: {
@@ -190,6 +241,16 @@ export default {
 		potency: 300, //Increase Black by 11
 		breaksCombo: true,
 	},
+	VERTHUNDER_II: {
+		id: 16524,
+		name: 'Verthunder II',
+		icon: 'https://xivapi.com/i/003000/003229.png',
+		onGcd: true,
+		cooldown: 2.5,
+		castTime: 2,
+		potency: 120, //Increase Black by 7
+		breaksCombo: true,
+	},
 	VERFIRE: {
 		id: 7510,
 		name: 'Verfire',
@@ -200,7 +261,7 @@ export default {
 		potency: 270, //Increase Black by 9
 		breaksCombo: true,
 	},
-	VERAREO: {
+	VERAERO: {
 		id: 7507,
 		name: 'Verareo',
 		icon: 'https://xivapi.com/i/003000/003205.png',
@@ -208,6 +269,16 @@ export default {
 		cooldown: 2.5,
 		castTime: 5,
 		potency: 300, //Increase White by 11
+		breaksCombo: true,
+	},
+	VERAERO_II: {
+		id: 16525,
+		name: 'Veraero II',
+		icon: 'https://xivapi.com/i/003000/003230.png',
+		onGcd: true,
+		cooldown: 2.5,
+		castTime: 2,
+		potency: 120, //Increase White by 7
 		breaksCombo: true,
 	},
 	VERSTONE: {
@@ -235,8 +306,8 @@ export default {
 		icon: 'https://xivapi.com/i/003000/003207.png',
 		onGcd: true,
 		cooldown: 2.5,
-		castTime: 2,
-		potency: 100, //Increase White and black by 3
+		castTime: 5,
+		potency: 200, //Increase White and black by 3
 		breaksCombo: true,
 	},
 	MOULINET: {
