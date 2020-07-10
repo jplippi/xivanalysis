@@ -31,8 +31,8 @@ const RESOURCE_SPENDERS = {
 	[ACTIONS.THE_BLACKEST_NIGHT.id]: {mp: -3000, blood: 0},
 	[ACTIONS.FLOOD_OF_SHADOW.id]: {mp: -3000, blood: 0},
 	[ACTIONS.EDGE_OF_SHADOW.id]: {mp: -3000, blood: 0},
-	[ACTIONS.BLOODSPILLER.id]: {mp: 0, blood: -50},
-	[ACTIONS.QUIETUS.id]: {mp: 0, blood: -50},
+	[ACTIONS.BLOODSPILLER.id]: {mp: 0, blood: -50, affectsWithDelirium: true},
+	[ACTIONS.QUIETUS.id]: {mp: 0, blood: -50, affectsWithDelirium: true},
 	[ACTIONS.LIVING_SHADOW.id]: {mp: 0, blood: -50},
 }
 const RESOURCE_GENERATORS = {
@@ -119,15 +119,15 @@ export default class Resources extends Module {
 
 	constructor(...args) {
 		super(...args)
-		this.addHook(['aoedamage', 'combo'], {by: 'player', abilityId: this._resourceEvents}, this._onEvent)
-		// Hook cast for Living Shadow, as it doesn't directly deal damage so doesn't have an aoedamage event
-		this.addHook('cast', {by: 'player', abilityId: ACTIONS.LIVING_SHADOW.id}, this._onEvent)
+		this.addEventHook(['normaliseddamage', 'combo'], {by: 'player', abilityId: this._resourceEvents}, this._onEvent)
+		// Hook cast for Living Shadow, as it doesn't directly deal damage so doesn't have a damage event
+		this.addEventHook('cast', {by: 'player', abilityId: ACTIONS.LIVING_SHADOW.id}, this._onEvent)
 		// Hook cast for TBN application
-		this.addHook('cast', {by: 'player', abilityId: ACTIONS.THE_BLACKEST_NIGHT.id}, this._onCastBlackestNight)
-		this.addHook('removebuff', {by: 'player', abilityId: STATUSES.BLACKEST_NIGHT.id}, this._onRemoveBlackestNight)
-		this.addHook('death', {by: 'player'}, this._onDeath)
-		this.addHook('raise', {by: 'player'}, this._onRaise)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('cast', {by: 'player', abilityId: ACTIONS.THE_BLACKEST_NIGHT.id}, this._onCastBlackestNight)
+		this.addEventHook('removebuff', {by: 'player', abilityId: STATUSES.BLACKEST_NIGHT.id}, this._onRemoveBlackestNight)
+		this.addEventHook('death', {by: 'player'}, this._onDeath)
+		this.addEventHook('raise', {by: 'player'}, this._onRaise)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	// -----
@@ -227,7 +227,7 @@ export default class Resources extends Module {
 		let actionMPGain = 0
 
 		if (RESOURCE_SPENDERS.hasOwnProperty(abilityId)) {
-			if (RESOURCE_SPENDERS[abilityId].blood < 0 && this.combatants.selected.hasStatus(STATUSES.DELIRIUM.id)) {
+			if (RESOURCE_SPENDERS[abilityId].blood < 0 && this.combatants.selected.hasStatus(STATUSES.DELIRIUM.id) && RESOURCE_SPENDERS[abilityId].affectsWithDelirium) {
 				// Blood spender under delirium - no change
 				actionBloodGain += 0
 			} else {
@@ -243,14 +243,14 @@ export default class Resources extends Module {
 			}
 		}
 
-		if (event.successfulHit && (event.type !== 'combo' && this.combatants.selected.hasStatus(STATUSES.BLOOD_WEAPON.id) && BLOOD_WEAPON_GENERATORS.hasOwnProperty(abilityId))) {
+		if (event.hasSuccessfulHit && (event.type !== 'combo' && this.combatants.selected.hasStatus(STATUSES.BLOOD_WEAPON.id) && BLOOD_WEAPON_GENERATORS.hasOwnProperty(abilityId))) {
 			// Actions that did not hit do not generate resources
 			// Don't double count blood weapon gains on comboed events
 			actionBloodGain += BLOOD_WEAPON_GENERATORS[abilityId].blood
 			actionMPGain += BLOOD_WEAPON_GENERATORS[abilityId].mp
 		}
 
-		if (event.successfulHit && RESOURCE_GENERATORS.hasOwnProperty(abilityId)) {
+		if (event.hasSuccessfulHit && RESOURCE_GENERATORS.hasOwnProperty(abilityId)) {
 			// Actions that did not hit do not generate resources
 			const actionInfo = RESOURCE_GENERATORS[abilityId]
 			if ((!actionInfo.requiresCombo && event.type !== 'combo') || event.type === 'combo') {
@@ -347,8 +347,8 @@ export default class Resources extends Module {
 					label: 'Blood',
 					steppedLine: true,
 					data: this._history.blood,
-					backgroundColor: _bloodColor.fade(0.8),
-					borderColor: _bloodColor.fade(0.5),
+					backgroundColor: _bloodColor.fade(0.8).toString(),
+					borderColor: _bloodColor.fade(0.5).toString(),
 				},
 			],
 		}
@@ -358,8 +358,8 @@ export default class Resources extends Module {
 					label: 'MP',
 					steppedLine: true,
 					data: this._history.mp,
-					backgroundColor: _mpColor.fade(0.8),
-					borderColor: _mpColor.fade(0.5),
+					backgroundColor: _mpColor.fade(0.8).toString(),
+					borderColor: _mpColor.fade(0.5).toString(),
 				},
 			],
 		}

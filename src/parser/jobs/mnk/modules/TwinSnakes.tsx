@@ -1,38 +1,41 @@
 import {Plural, Trans} from '@lingui/react'
-import React from 'react'
-
 import {ActionLink, StatusLink} from 'components/ui/DbLink'
-import {getDataBy} from 'data'
 import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
-
 import {BuffEvent, CastEvent} from 'fflogs'
 import Module, {dependency} from 'parser/core/Module'
 import Checklist, {Requirement, Rule} from 'parser/core/modules/Checklist'
 import Combatants from 'parser/core/modules/Combatants'
+import {Data} from 'parser/core/modules/Data'
 import Enemies from 'parser/core/modules/Enemies'
-import Invulnerability from 'parser/core/modules/Invulnerability'
+import {EntityStatuses} from 'parser/core/modules/EntityStatuses'
+import {Invulnerability} from 'parser/core/modules/Invulnerability'
 import Suggestions, {SEVERITY, Suggestion, TieredSuggestion} from 'parser/core/modules/Suggestions'
-
+import React from 'react'
 import DISPLAY_ORDER from './DISPLAY_ORDER'
 
+// Expected time to drop Twin in GL4 (basically part way thru previous GCD)
 const TWIN_SNAKES_CYCLE_BUFFER = 3000
-const TWIN_SNAKES_CYCLE_LENGTH = 6
+
+// Expected GCDs between TS in GL3 or lower
+const TWIN_SNAKES_CYCLE_LENGTH = 5
 
 class TwinState {
+	data: Data
 	casts: CastEvent[] = []
 	start: number
 	end?: number
 
-	constructor(timestamp: number) {
+	constructor(timestamp: number, data: Data) {
+		this.data = data
 		this.start = timestamp
 	}
 
 	// Mainly here in case we care about oGCDs being unbuffed later
 	public get gcds(): number {
 		return this.casts.filter(event => {
-			const action = getDataBy(ACTIONS, 'id', event.ability.guid) as TODO
-			return action && action.onGcd
+			const action = this.data.getAction(event.ability.guid)
+			return action?.onGcd
 		}).length
 	}
 }
@@ -42,9 +45,11 @@ export default class TwinSnakes extends Module {
 
 	@dependency private checklist!: Checklist
 	@dependency private combatants!: Combatants
+	@dependency private data!: Data
 	@dependency private enemies!: Enemies
 	@dependency private invuln!: Invulnerability
 	@dependency private suggestions!: Suggestions
+	@dependency private entityStatuses!: EntityStatuses
 
 	private history: TwinState[] = []
 	private twinSnake?: TwinState
@@ -61,21 +66,21 @@ export default class TwinSnakes extends Module {
 
 	protected init() {
 		// Hook all GCDs so we can count GCDs in buff windows
-		this.addHook('cast', {by: 'player'}, this.onCast)
+		this.addEventHook('cast', {by: 'player'}, this.onCast)
 
 		// This gets weird because, we don't wanna penalise if it was from FPF...
-		this.addHook('applybuff', {to: 'player', abilityId: STATUSES.TWIN_SNAKES.id}, this.onGain)
-		this.addHook('refreshbuff', {to: 'player', abilityId: STATUSES.TWIN_SNAKES.id}, this.onRefresh)
-		this.addHook('removebuff', {to: 'player', abilityId: STATUSES.TWIN_SNAKES.id}, this.onDrop)
+		this.addEventHook('applybuff', {to: 'player', abilityId: STATUSES.TWIN_SNAKES.id}, this.onGain)
+		this.addEventHook('refreshbuff', {to: 'player', abilityId: STATUSES.TWIN_SNAKES.id}, this.onRefresh)
+		this.addEventHook('removebuff', {to: 'player', abilityId: STATUSES.TWIN_SNAKES.id}, this.onDrop)
 
-		this.addHook('complete', this.onComplete)
+		this.addEventHook('complete', this.onComplete)
 	}
 
 	private onCast(event: CastEvent): void {
-		const action = getDataBy(ACTIONS, 'id', event.ability.guid) as TODO
+		const action = this.data.getAction(event.ability.guid)
 
 		// Only include GCDs
-		if (!action || !action.onGcd) {
+		if (!action?.onGcd) {
 			return
 		}
 
@@ -88,7 +93,7 @@ export default class TwinSnakes extends Module {
 			}
 
 		// Ignore Form Shift, theres probably forced downtime so we expect TS to get weird anyway
-		case (ACTIONS.FORM_SHIFT):
+		case (ACTIONS.FORM_SHIFT.id):
 			break
 
 		// Count FPF, but check if it's a bad one
@@ -110,7 +115,7 @@ export default class TwinSnakes extends Module {
 	// Only happens from TS itself
 	// This might be better checking if the GCD before it was buffed but ehh
 	private onGain(event: BuffEvent): void {
-		if (this.twinSnake && this.twinSnake.end) {
+		if (this.twinSnake?.end) {
 			const unbuffedGcds = this.gcdsSinceTS - this.twinSnake.gcds
 			const unbuffedTime = event.timestamp - this.twinSnake.end
 			// TODO: some kind of downtime check, maybe a warning for non-GL4
@@ -120,7 +125,7 @@ export default class TwinSnakes extends Module {
 		}
 
 		// Start a new window
-		this.twinSnake = new TwinState(event.timestamp)
+		this.twinSnake = new TwinState(event.timestamp, this.data)
 		this.gcdsSinceTS = 0
 	}
 
@@ -207,16 +212,9 @@ export default class TwinSnakes extends Module {
 		}
 	}
 
-	private getDebuffUptimePercent(statusId: number): number {
-		const statusUptime = this.enemies.getStatusUptime(statusId)
-		const fightDuration = this.parser.fightDuration - this.invuln.getInvulnerableUptime()
-
-		return (statusUptime / fightDuration) * 100
-	}
-
 	private getBuffUptimePercent(statusId: number): number {
-		const statusUptime = this.combatants.getStatusUptime(statusId, this.parser.player.id)
-		const fightUptime = this.parser.fightDuration - this.invuln.getInvulnerableUptime()
+		const statusUptime = this.entityStatuses.getStatusUptime(statusId, this.combatants.getEntities())
+		const fightUptime = this.parser.currentDuration - this.invuln.getInvulnerableUptime()
 
 		return (statusUptime / fightUptime) * 100
 	}

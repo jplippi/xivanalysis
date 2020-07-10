@@ -1,19 +1,23 @@
 import {MessageDescriptor} from '@lingui/core'
-import ResultSegment from 'components/Analyse/ResultSegment'
+import * as Sentry from '@sentry/browser'
+import ResultSegment from 'components/LegacyAnalyse/ResultSegment'
 import ErrorMessage from 'components/ui/ErrorMessage'
-import {languageToEdition} from 'data/PATCHES'
+import {getReportPatch, languageToEdition} from 'data/PATCHES'
 import {DependencyCascadeError, ModulesNotFoundError} from 'errors'
-import {Actor, Event, Fight, Pet} from 'fflogs'
-import Raven from 'raven-js'
+import type {Event} from 'events'
+import type {Actor as FflogsActor, Fight, Pet} from 'fflogs'
 import React from 'react'
-import {Report} from 'store/report'
+import {Report as LegacyReport} from 'store/report'
 import toposort from 'toposort'
 import {extractErrorContext} from 'utilities'
+import {Dispatcher} from './Dispatcher'
 import {Meta} from './Meta'
 import Module, {DISPLAY_MODE, MappedDependency} from './Module'
 import {Patch} from './Patch'
+import {formatDuration} from 'utilities'
+import {Report, Pull, Actor} from 'report'
 
-interface Player extends Actor {
+interface Player extends FflogsActor {
 	pets: Pet[]
 }
 
@@ -25,17 +29,37 @@ export interface Result {
 	markup: React.ReactNode
 }
 
+export interface InitEvent {
+	type: 'init'
+	timestamp: number
+}
+export interface CompleteEvent {
+	type: 'complete'
+	timestamp: number
+}
+
+declare module 'events' {
+	interface EventTypeRepository {
+		parser: InitEvent | CompleteEvent
+	}
+}
+
 class Parser {
 	// -----
 	// Properties
 	// -----
-	readonly report: Report
+	readonly dispatcher: Dispatcher
+
+	readonly report: LegacyReport
 	readonly fight: Fight
 	readonly player: Player
 	readonly patch: Patch
 
-	meta: Meta
-	_timestamp = 0
+	readonly newReport: Report
+	readonly pull: Pull
+	readonly actor: Actor
+
+	readonly meta: Meta
 
 	modules: Record<string, Module> = {}
 	_constructors: Record<string, typeof Module> = {}
@@ -47,14 +71,21 @@ class Parser {
 	_fabricationQueue: Event[] = []
 
 	get currentTimestamp() {
-		// TODO: this.finished?
-		return Math.min(this.fight.end_time, this._timestamp)
+		const start = this.eventTimeOffset
+		const end = start + this.pull.duration
+		return Math.min(end, Math.max(start, this.dispatcher.timestamp))
 	}
 
+	get currentDuration() {
+		return this.currentTimestamp - this.eventTimeOffset
+	}
+
+	// TODO: REMOVE
 	get fightDuration() {
-		// TODO: should i have like... currentDuration and fightDuration?
-		//       this seems a bit jank
-		return this.currentTimestamp - this.fight.start_time
+		if (process.env.NODE_ENV === 'development') {
+			throw new Error('Please migrate your calls to `parser.fightDuration` to either `parser.pull.duration` (if you need the full pull duration) or `parser.currentDuration` if you need the zeroed current timestamp.')
+		}
+		return this.currentDuration
 	}
 
 	// Get the friendlies that took part in the current fight
@@ -65,8 +96,16 @@ class Parser {
 	}
 
 	get parseDate() {
-		// The report timestamp is relative to the report timestamp, and in ms. Convert.
-		return Math.round((this.report.start + this.fight.start_time) / 1000)
+		// TODO: normalise time to ms across the board
+		return Math.round(this.pull.timestamp / 1000)
+	}
+
+	/** Offset for events to zero their timestamp to the start of the pull being analysed. */
+	get eventTimeOffset() {
+		// TODO: This is _wholly_ reliant on fflog's timestamp handling. Once everyone
+		// is using this instead of start_time, we can start normalising event timestamps
+		// at the source level.
+		return this.pull.timestamp - this.newReport.timestamp
 	}
 
 	// -----
@@ -75,23 +114,32 @@ class Parser {
 
 	constructor(opts: {
 		meta: Meta,
-		report: Report,
+		report: LegacyReport,
 		fight: Fight,
+		fflogsActor: FflogsActor,
+
+		newReport: Report,
+		pull: Pull,
 		actor: Actor,
+
+		dispatcher?: Dispatcher,
 	}) {
+		this.dispatcher = opts.dispatcher ?? new Dispatcher()
+
 		this.meta = opts.meta
 		this.report = opts.report
 		this.fight = opts.fight
 
-		// Set initial timestamp
-		this._timestamp = opts.fight.start_time
+		this.newReport = opts.newReport
+		this.pull = opts.pull
+		this.actor = opts.actor
 
 		// Get a list of the current player's pets and set it on the player instance for easy reference
 		const pets = opts.report.friendlyPets
-			.filter(pet => pet.petOwner === opts.actor.id)
+			.filter(pet => pet.petOwner === opts.fflogsActor.id)
 
 		this.player = {
-			...opts.actor,
+			...opts.fflogsActor,
 			pets,
 		}
 
@@ -176,111 +224,63 @@ class Parser {
 
 		// Loop & trigger all the events & fabrications
 		for (const event of this.iterateEvents(events)) {
-			this._timestamp = event.timestamp
-			this.triggerEvent(event)
+			// TODO: Do I need to keep a history?
+			const moduleErrors = this.dispatcher.dispatch(event, this._triggerModules)
+
+			for (const handle in moduleErrors) {
+				if (!moduleErrors.hasOwnProperty(handle)) { continue }
+				const error = moduleErrors[handle]
+
+				this.captureError({
+					error,
+					type: 'event',
+					module: handle,
+					event,
+				})
+
+				this._setModuleError(handle, error)
+			}
 		}
 	}
 
-	*iterateEvents(events: Event[]) {
+	private *iterateEvents(events: Event[]): Generator<Event, void, undefined> {
 		const eventIterator = events[Symbol.iterator]()
 
 		// Start the parse with an 'init' fab
-		yield this.hydrateFabrication({type: 'init'})
+		yield {
+			type: 'init',
+			timestamp: this.fight.start_time,
+		}
 
-		let obj
-		// eslint-disable-next-line no-cond-assign
-		while (!(obj = eventIterator.next()).done) {
+		let obj = eventIterator.next()
+		while (!obj.done) {
 			// Iterate over the actual event first
 			yield obj.value
+			obj = eventIterator.next()
 
 			// Iterate over any fabrications arising from the event and clear the queue
 			yield* this._fabricationQueue
 			this._fabricationQueue = []
-
 		}
 
 		// Finish with 'complete' fab
-		yield this.hydrateFabrication({type: 'complete'})
-	}
-
-	hydrateFabrication(event: Partial<Event>): Event {
-		// TODO: they've got a 'triggered' prop too...?
-		return {
-			// Provide default fields
-			timestamp: this.currentTimestamp,
-			type: 'fabrication',
-			sourceID: -1,
-			sourceIsFriendly: true,
-			targetID: -1,
-			targetInstance: -1,
-			targetIsFriendly: true,
-
-			// Fill out with any overwritten fields
-			...event,
+		yield {
+			type: 'complete',
+			timestamp: this.fight.end_time,
 		}
 	}
 
-	fabricateEvent(event: Partial<Event>) {
-		this._fabricationQueue.push(this.hydrateFabrication(event))
+	fabricateEvent(event: Event) {
+		this._fabricationQueue.push(event)
 	}
 
-	triggerEvent(event: Event) {
-		// TODO: Do I need to keep a history?
-		this._triggerModules.forEach(mod => {
-			try {
-				this.modules[mod].triggerEvent(event)
-			} catch (error) {
-				// If we're in dev, throw the error back up
-				if (process.env.NODE_ENV === 'development') {
-					throw error
-				}
-
-				// Error trying to handle an event, tell sentry
-				// But first, gather some extra context
-				const tags = {
-					type: 'event',
-					event: event.type.toString(),
-					job: this.player && this.player.type,
-					module: mod,
-				}
-
-				const extra: Record<string, any> = {
-					report: this.report && this.report.code,
-					fight: this.fight && this.fight.id,
-					player: this.player && this.player.id,
-					event,
-				}
-
-				// Gather extra data for the error report.
-				const [data, errors] = this._gatherErrorContext(mod, 'event', error, event)
-				extra.modules = data
-
-				for (const [m, err] of errors) {
-					Raven.captureException(err, {
-						tags: {
-							...tags,
-							module: m,
-						},
-						extra,
-					})
-				}
-
-				// Now that we have all the possible context, submit the
-				// error to Raven.
-				Raven.captureException(error, {
-					tags,
-					extra,
-				})
-
-				// Also cascade the error through the dependency tree
-				this._setModuleError(mod, error)
-			}
-		})
-	}
-
-	_setModuleError(mod: string, error: Error) {
+	private _setModuleError(mod: string, error: Error) {
 		// Set the error for the current module
-		this._triggerModules.splice(this._triggerModules.indexOf(mod), 1)
+		const moduleIndex = this._triggerModules.indexOf(mod)
+		if (moduleIndex !== -1 ) {
+			this._triggerModules = this._triggerModules.slice(0)
+			this._triggerModules.splice(moduleIndex, 1)
+		}
 		this._moduleErrors[mod] = error
 
 		// Cascade via dependencies
@@ -300,7 +300,7 @@ class Parser {
 	 * @param event The event that was being processed when the error occurred
 	 * @returns The resulting data along with an object containing errors that were encountered running getErrorContext methods.
 	 */
-	_gatherErrorContext(
+	private _gatherErrorContext(
 		mod: string,
 		source: 'event' | 'output',
 		error: Error,
@@ -382,44 +382,10 @@ class Parser {
 			try {
 				output = module.output()
 			} catch (error) {
-				if (process.env.NODE_ENV === 'development') {
-					throw error
-				}
-
-				// Error generating output for a module. Tell Sentry, but first,
-				// gather some extra context
-
-				const tags = {
+				this.captureError({
+					error,
 					type: 'output',
-					job: this.player && this.player.type,
 					module: mod,
-				}
-
-				const extra: Record<string, any> = {
-					report: this.report && this.report.code,
-					fight: this.fight && this.fight.id,
-					player: this.player && this.player.id,
-				}
-
-				// Gather extra data for the error report.
-				const [data, errors] = this._gatherErrorContext(mod, 'output', error)
-				extra.modules = data
-
-				for (const [m, err] of errors) {
-					Raven.captureException(err, {
-						tags: {
-							...tags,
-							module: m,
-						},
-						extra,
-					})
-				}
-
-				// Now that we have all the possible context, submit the
-				// error to Raven.
-				Raven.captureException(error, {
-					tags,
-					extra,
 				})
 
 				// Also add the error to the results to be displayed.
@@ -442,23 +408,78 @@ class Parser {
 	}
 
 	// -----
+	// Error handling
+	// -----
+
+	private captureError(opts: {
+		error: Error,
+		type: 'event' | 'output',
+		module: string,
+		event?: Event,
+	}) {
+		// Bypass error handling in dev
+		if (process.env.NODE_ENV === 'development') {
+			throw opts.error
+		}
+
+		// If the log should be analysed on a different branch, we'll probably be getting a bunch of errors - safe to ignore, as the logic will be fundamentally different.
+		if (getReportPatch(this.newReport).branch) {
+			return
+		}
+
+		// Gather info for Sentry
+		const tags = {
+			type: opts.type,
+			job: this.actor.job,
+			module: opts.module,
+		}
+
+		const extra: Record<string, any> = {
+			source: this.newReport.meta.source,
+			pull: this.pull.id,
+			actor: this.actor.id,
+			event: opts.event,
+		}
+
+		// Gather extra data for the error report.
+		const [data, errors] = this._gatherErrorContext(opts.module, opts.type, opts.error)
+		extra.modules = data
+
+		for (const [m, err] of errors) {
+			Sentry.withScope(scope => {
+				scope.setTags({...tags, module: m})
+				scope.setExtras(extra)
+				Sentry.captureException(err)
+			})
+		}
+
+		// Now that we have all the possible context, submit the
+		// error to Sentry.
+		Sentry.withScope(scope => {
+			scope.setTags(tags)
+			scope.setExtras(extra)
+			Sentry.captureException(opts.error)
+		})
+	}
+
+	// -----
 	// Utilities
 	// -----
 
-	byPlayer(event: Event, playerId = this.player.id) {
+	byPlayer(event: {sourceID?: number}, playerId = this.player.id) {
 		return event.sourceID === playerId
 	}
 
-	toPlayer(event: Event, playerId = this.player.id) {
+	toPlayer(event: {targetID?: number}, playerId = this.player.id) {
 		return event.targetID === playerId
 	}
 
-	byPlayerPet(event: Event, playerId = this.player.id) {
+	byPlayerPet(event: {sourceID?: number}, playerId = this.player.id) {
 		const pet = this.report.friendlyPets.find(pet => pet.id === event.sourceID)
 		return pet && pet.petOwner === playerId
 	}
 
-	toPlayerPet(event: Event, playerId = this.player.id) {
+	toPlayerPet(event: {targetID?: number}, playerId = this.player.id) {
 		const pet = this.report.friendlyPets.find(pet => pet.id === event.targetID)
 		return pet && pet.petOwner === playerId
 	}
@@ -468,19 +489,7 @@ class Parser {
 	}
 
 	formatDuration(duration: number, secondPrecision?: number) {
-		/* tslint:disable:no-magic-numbers */
-		duration /= 1000
-		const seconds = duration % 60
-		if (duration < 60) {
-			const precision = secondPrecision !== undefined? secondPrecision : seconds < 10? 2 : 0
-			return seconds.toFixed(precision) + 's'
-		}
-		const precision = secondPrecision !== undefined ? secondPrecision : 0
-		const secondsText = precision ? seconds.toFixed(precision) : '' + Math.floor(seconds)
-		let pointPos = secondsText.indexOf('.')
-		if (pointPos === -1) { pointPos = secondsText.length }
-		return `${Math.floor(duration / 60)}:${pointPos === 1? '0' : ''}${secondsText}`
-		/* tslint:enable:no-magic-numbers */
+		return formatDuration(duration, {secondPrecision, hideMinutesIfZero: true, showNegative: true})
 	}
 
 	/**

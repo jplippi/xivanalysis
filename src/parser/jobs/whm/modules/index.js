@@ -1,17 +1,17 @@
-import Assize from './Assize'
 import DoTs from './DoTs'
-import Benison from './Benison'
 import Lilies from './Lilies'
+import oGCDs from './oGCDs'
 import Overheal from './Overheal'
 import Speedmod from './Speedmod'
 import Swiftcast from './Swiftcast'
+import WhmInterrupts from './Interrupts'
 
 export default [
-	Assize,
-	Benison,
 	DoTs,
 	Lilies,
+	oGCDs,
 	Overheal,
 	Speedmod,
 	Swiftcast,
+	WhmInterrupts,
 ]

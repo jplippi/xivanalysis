@@ -3,7 +3,7 @@ import {ActionLink, StatusLink} from 'components/ui/DbLink'
 import {getDataBy} from 'data'
 import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
-import {Status} from 'data/STATUSES/STATUSES'
+import {Status} from 'data/STATUSES'
 import {BuffEvent, CastEvent} from 'fflogs'
 import Module, {dependency} from 'parser/core/Module'
 import Suggestions, {SEVERITY, TieredSuggestion} from 'parser/core/modules/Suggestions'
@@ -30,9 +30,9 @@ export default class CelestialOpposition extends Module {
 	private activeSect: Status | undefined
 
 	protected init() {
-		this.addHook('cast', {abilityId: ACTIONS.CELESTIAL_OPPOSITION.id, by: 'player'}, this.onCast)
-		this.addHook('applybuff', {abilityId: [STATUSES.DIURNAL_SECT.id, STATUSES.NOCTURNAL_SECT.id], by: 'player'}, this.onSect)
-		this.addHook('complete', this.onComplete)
+		this.addEventHook('cast', {abilityId: ACTIONS.CELESTIAL_OPPOSITION.id, by: 'player'}, this.onCast)
+		this.addEventHook('applybuff', {abilityId: [STATUSES.DIURNAL_SECT.id, STATUSES.NOCTURNAL_SECT.id], by: 'player'}, this.onSect)
+		this.addEventHook('complete', this.onComplete)
 	}
 
 	private onCast(event: CastEvent) {
@@ -52,7 +52,7 @@ export default class CelestialOpposition extends Module {
 	}
 
 	onComplete() {
-		const holdDuration = this.uses === 0 ? this.parser.fightDuration : this.totalHeld
+		const holdDuration = this.uses === 0 ? this.parser.currentDuration : this.totalHeld
 		const usesMissed = Math.floor(holdDuration / (ACTIONS.CELESTIAL_OPPOSITION.cooldown * 1000))
 		const fightDuration = this.parser.fight.end_time - this.parser.fight.start_time
 		const maxUses = (fightDuration / (ACTIONS.CELESTIAL_OPPOSITION.cooldown * 1000) ) - 1

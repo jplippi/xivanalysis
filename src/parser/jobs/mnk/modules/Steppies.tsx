@@ -1,16 +1,13 @@
 import {Plural, Trans} from '@lingui/react'
-import React from 'react'
-
 import {ActionLink, StatusLink} from 'components/ui/DbLink'
 import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
-
-import {CastEvent, DamageEvent} from 'fflogs'
 import Module, {dependency} from 'parser/core/Module'
 import Checklist, {Requirement, Rule} from 'parser/core/modules/Checklist'
 import Combatants from 'parser/core/modules/Combatants'
+import {NormalisedDamageEvent} from 'parser/core/modules/NormalisedEvents'
 import Suggestions, {SEVERITY, TieredSuggestion} from 'parser/core/modules/Suggestions'
-
+import React from 'react'
 import DISPLAY_ORDER from './DISPLAY_ORDER'
 
 const LEAD_BOOT_POTENCY = 300
@@ -31,11 +28,13 @@ const WEAK_BOOT_SEVERITY = {
 
 class Boot {
 	crit: boolean
+	opo: boolean
 	weak: boolean
 	timestamp: number
 
-	constructor(crit: boolean, weak: boolean, timestamp: number) {
+	constructor(crit: boolean, opo: boolean, weak: boolean, timestamp: number) {
 		this.crit = crit
+		this.opo = opo
 		this.weak = weak
 		this.timestamp = timestamp
 	}
@@ -51,13 +50,20 @@ export default class Steppies extends Module {
 	private steppies: Boot[] = []
 
 	protected init(): void {
-		this.addHook('damage', {by: 'player', abilityId: ACTIONS.BOOTSHINE.id}, this.onDamage)
-		this.addHook('complete', this.onComplete)
+		this.addEventHook('normaliseddamage', {by: 'player', abilityId: ACTIONS.BOOTSHINE.id}, this.onDamage)
+		this.addEventHook('complete', this.onComplete)
 	}
 
-	private onDamage(event: DamageEvent): void {
-		const boot = new Boot(event.criticalHit, this.combatants.selected.hasStatus(STATUSES.LEADEN_FIST.id), event.timestamp)
-		this.steppies.push(boot)
+	private onDamage(event: NormalisedDamageEvent): void {
+		if (event.hitCount > 0) {
+			const boot = new Boot(
+				event.criticalHits > 0,
+				this.combatants.selected.hasStatus(STATUSES.OPO_OPO_FORM.id),
+				!this.combatants.selected.hasStatus(STATUSES.LEADEN_FIST.id),
+				event.timestamp)
+
+			this.steppies.push(boot)
+		}
 	}
 
 	private onComplete(): void {
@@ -101,15 +107,9 @@ export default class Steppies extends Module {
 		}))
 	}
 
-	getUnbuffedCount(boots: Boot[]): number {
-		return boots.reduce((total, current) => current.weak ? total : total+1, 0)
-	}
+	getUnbuffedCount = (boots: Boot[]): number => boots.filter(boot => boot.weak).length
 
-	getUncritCount(boots: Boot[]): number {
-		return boots.reduce((total, current) => current.crit ? total : total+1, 0)
-	}
+	getUncritCount = (boots: Boot[]): number => boots.filter(boot => !boot.crit && boot.opo).length
 
-	getLeadenPercent(boots: Boot[]): number {
-		return 100 - (this.getUnbuffedCount(boots) / boots.length) * 100
-	}
+	getLeadenPercent = (boots: Boot[]): number => 100 - (this.getUnbuffedCount(boots) / boots.length) * 100
 }

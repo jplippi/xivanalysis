@@ -8,10 +8,11 @@ import {ActionLink} from 'components/ui/DbLink'
 import TimeLineChart from 'components/ui/TimeLineChart'
 import ACTIONS from 'data/ACTIONS'
 import JOBS from 'data/JOBS'
-import {CastEvent, Event} from 'fflogs'
+import {CastEvent} from 'fflogs'
 import Module, {dependency, DISPLAY_MODE} from 'parser/core/Module'
 import Checklist, {Requirement, Rule} from 'parser/core/modules/Checklist'
 import {ComboEvent} from 'parser/core/modules/Combos'
+import {NormalisedDamageEvent} from 'parser/core/modules/NormalisedEvents'
 import Suggestions, {SEVERITY, TieredSuggestion} from 'parser/core/modules/Suggestions'
 
 const ON_CAST_GENERATORS = {
@@ -33,6 +34,11 @@ const SINGLE_TARGET_CIRCLE_SEVERITY_TIERS = {
 	1: SEVERITY.MINOR,
 	2: SEVERITY.MEDIUM,
 	4: SEVERITY.MAJOR,
+}
+
+const LEFTOVER_AMMO_SEVERITY_TIERS = {
+	1: SEVERITY.MINOR,
+	2: SEVERITY.MEDIUM,
 }
 
 const MAX_AMMO = 2
@@ -63,8 +69,8 @@ export default class Ammo extends Module {
 	@dependency private suggestions!: Suggestions
 
 	protected init() {
-		this.addHook('init', this.pushToHistory)
-		this.addHook(
+		this.addEventHook('init', this.pushToHistory)
+		this.addEventHook(
 			'cast',
 			{
 				by: 'player',
@@ -72,7 +78,7 @@ export default class Ammo extends Module {
 			},
 			this.onCastGenerator,
 		)
-		this.addHook(
+		this.addEventHook(
 			'combo',
 			{
 				by: 'player',
@@ -80,7 +86,7 @@ export default class Ammo extends Module {
 			},
 			this.onComboGenerator,
 		)
-		this.addHook(
+		this.addEventHook(
 			'cast',
 			{
 				by: 'player',
@@ -88,14 +94,13 @@ export default class Ammo extends Module {
 			},
 			this.onSpender,
 		)
-		this.addHook('aoedamage', {by: 'player', abilityId: ACTIONS.FATED_CIRCLE.id}, this.onFatedCircle)
-		this.addHook('death', {to: 'player'}, this.onDeath)
-		this.addHook('complete', this.onComplete)
+		this.addEventHook('normaliseddamage', {by: 'player', abilityId: ACTIONS.FATED_CIRCLE.id}, this.onFatedCircle)
+		this.addEventHook('death', {to: 'player'}, this.onDeath)
+		this.addEventHook('complete', this.onComplete)
 	}
 
-	private onFatedCircle(event: Event) {
-		if (event.hasOwnProperty('hits') &&
-			(event as any).hits.length < 2) {
+	private onFatedCircle(event: NormalisedDamageEvent) {
+		if (event.hitCount < 2) {
 			this.erroneousCircles++
 		}
 	}
@@ -170,6 +175,18 @@ export default class Ammo extends Module {
 			value: this.erroneousCircles,
 		}))
 
+		this.suggestions.add(new TieredSuggestion({
+			icon: ACTIONS.BLOODFEST.icon,
+			content: <Trans id="gnb.ammo.leftover-ammo.content">
+				Avoid having leftover ammo at the end of a fight, consider using the ammo earlier if possible. <ActionLink {...ACTIONS.BURST_STRIKE}/> is more potency than any of your <ActionLink {...ACTIONS.SOLID_BARREL}/> combo.
+			</Trans>,
+			why: <Trans id="gnb.ammo.leftover-ammo.why">
+				You had <Plural value={this.leftoverAmmo} one="# cartridge" other="# cartridges"/> remaining at the end of the fight.
+			</Trans>,
+			tiers: LEFTOVER_AMMO_SEVERITY_TIERS,
+			value: this.leftoverAmmo,
+		}))
+
 		this.checklist.add(new Rule({
 			name: 'Cartridge Usage',
 			description: <Trans id="gnb.ammo.waste.content">
@@ -240,8 +257,8 @@ export default class Ammo extends Module {
 					label: 'Cartridges',
 					steppedLine: true,
 					data: this.ammoHistory,
-					backgroundColor: ammoColor.fade(0.8),
-					borderColor: ammoColor.fade(0.5),
+					backgroundColor: ammoColor.fade(0.8).toString(),
+					borderColor: ammoColor.fade(0.5).toString(),
 				},
 			],
 		}

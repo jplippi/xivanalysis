@@ -13,13 +13,14 @@ export default class Buffs extends Module {
 	static dependencies = [
 		'checklist',
 		'combatants',
+		'entityStatuses',
 		'invuln',
 	]
 
 	constructor(...args) {
 		super(...args)
 
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onComplete() {
@@ -43,8 +44,8 @@ export default class Buffs extends Module {
 	}
 
 	getUptimePercent(StatusId) {
-		const statusUptime = this.combatants.getStatusUptime((StatusId), this.parser.player.id)
-		const fightUptime = this.parser.fightDuration - this.invuln.getInvulnerableUptime()
+		const statusUptime = this.entityStatuses.getStatusUptime((StatusId), this.combatants.getEntities())
+		const fightUptime = this.parser.currentDuration - this.invuln.getInvulnerableUptime()
 
 		return (statusUptime / fightUptime) * 100
 	}

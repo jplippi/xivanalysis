@@ -28,6 +28,7 @@ export default class DoTs extends Module {
 	static dependencies = [
 		'checklist',
 		'enemies',
+		'entityStatuses',
 		'invuln',
 		'suggestions',
 	]
@@ -42,18 +43,18 @@ export default class DoTs extends Module {
 			by: 'player',
 			abilityId: [STATUSES.DIA.id],
 		}
-		this.addHook(['applydebuff', 'refreshdebuff'], filter, this._onDotApply)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook(['applydebuff', 'refreshdebuff'], filter, this._onDotApply)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onDotApply(event) {
 		// Make sure we're tracking for this target
 		const applicationKey = `${event.targetID}|${event.targetInstance}`
-		let lastApplication = this._lastApplication[applicationKey] = this._lastApplication[applicationKey] || 0
+		const lastApplication = this._lastApplication[applicationKey] || 0
 
 		// If it's not been applied yet, or we're rushing, set it and skip out
 		if (!lastApplication) {
-			lastApplication = event.timestamp
+			this._lastApplication[applicationKey] = event.timestamp
 			return
 		}
 
@@ -67,7 +68,7 @@ export default class DoTs extends Module {
 		// Capping clip at 0 - less than that is downtime, which is handled by the checklist requirement
 		this._clip += Math.max(0, clip)
 
-		lastApplication = event.timestamp
+		this._lastApplication[applicationKey] = event.timestamp
 	}
 
 	_onComplete() {
@@ -91,9 +92,10 @@ export default class DoTs extends Module {
 			this.suggestions.add(new TieredSuggestion({
 				icon: ACTIONS.DIA.icon,
 				content: <Trans id="whm.dots.suggestion.clip-dia.content">
-					Avoid refreshing Dia significantly before its expiration, this will allow you to cast more Glare.
+					Avoid refreshing Dia significantly before its expiration, this will allow you to cast more Glares.
 				</Trans>,
 				tiers: SUGGESTION_TIERS,
+				value: this._clip,
 				why: <Trans id="whm.dots.suggestion.clip-dia.why">
 					{this.parser.formatDuration(this._clip)} of {STATUSES.DIA.name} lost to early refreshes.
 				</Trans>,
@@ -102,8 +104,8 @@ export default class DoTs extends Module {
 	}
 
 	getDotUptimePercent(statusId) {
-		const statusUptime = this.enemies.getStatusUptime(statusId)
-		const fightDuration = this.parser.fightDuration - this.invuln.getInvulnerableUptime()
+		const statusUptime = this.entityStatuses.getStatusUptime(statusId, this.enemies.getEntities())
+		const fightDuration = this.parser.currentDuration - this.invuln.getInvulnerableUptime()
 
 		return (statusUptime / fightDuration) * 100
 	}

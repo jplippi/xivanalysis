@@ -1,17 +1,14 @@
-import React from 'react'
 import _ from 'lodash'
-
-import ACTIONS, {COOLDOWN_GROUPS} from 'data/ACTIONS'
 import Module from 'parser/core/Module'
-import {ItemGroup, Item} from './Timeline'
-import {getDataBy} from 'data'
+import {ActionItem, ContainerRow} from './Timeline'
 
 // Track the cooldowns on actions and shit
 export default class Cooldowns extends Module {
 	static handle = 'cooldowns'
 	static dependencies = [
-		'timeline',
+		'data',
 		'downtime',
+		'timeline',
 	]
 
 	// Array used to sort cooldowns in the timeline. Elements should be either IDs for
@@ -20,74 +17,80 @@ export default class Cooldowns extends Module {
 	// Check the NIN and SMN modules for examples.
 	static cooldownOrder = []
 
+	_cooldownGroups = {}
+
 	_currentAction = null
 	_cooldowns = {}
 	_groups = {}
+	_rows = {}
 
 	constructor(...args) {
 		super(...args)
 
-		// Pre-build groups for actions explicitly set by subclasses
-		this._buildGroups(this.constructor.cooldownOrder)
+		this._cooldownGroups = _.groupBy(this.data.actions, 'cooldownGroup')
 
-		this.addHook('begincast', {by: 'player'}, this._onBeginCast)
-		this.addHook('cast', {by: 'player'}, this._onCast)
-		this.addHook('complete', this._onComplete)
+		// Pre-build rows for actions explicitly set by subclasses
+		if (this.constructor.cooldownOrder) {
+			this._buildRows(this.constructor.cooldownOrder)
+		}
+
+		this.addEventHook('begincast', {by: 'player'}, this._onBeginCast)
+		this.addEventHook('cast', {by: 'player'}, this._onCast)
+		this.addEventHook('complete', this._onComplete)
 	}
 
-	_buildGroups(groups) {
-		// If there's no groups, noop
-		if (!groups) { return }
+	_buildRows(mappings) {
+		mappings.map((mapping, index) => {
+			const order = -(mappings.length - index)
 
-		const ids = groups.map((data, i) => {
-			const order = -(groups.length - i)
-
-			// If it's just an action id, build a group for it and stop
-			if (typeof data === 'number') {
-				const action = getDataBy(ACTIONS, 'id', data)
-				this._buildGroup({
-					id: data,
-					content: action && action.name,
-					order,
-				})
-				return data
+			// If it's just the ID of an action, build a row for it and bail
+			if (typeof mapping === 'number') {
+				const action = this.data.getAction(mapping)
+				return this._buildRow(mapping, {label: action?.name, order})
 			}
 
-			// Build the base group
-			const group = this._buildGroup({
-				id: data.name,
-				content: data.name,
-				order,
-			})
+			// Otherwise, it's a grouping - build a base row
+			const row = this._buildRow(mapping.name, {label: mapping.name, order})
 
-			if (data.merge) {
-				// If it's a merge group, we only need to register our group for each of the IDs
-				data.actions.forEach(id => {
-					this._groups[id] = group
+			if (mapping.merge) {
+				// If it's a merge group, it'll be absorbing all the child actions
+				// Register the group for each of the action IDs
+				mapping.actions.forEach(id => {
+					this._rows[id] = row
 				})
 			} else {
-				// Otherwise, build nested groups for each action
-				group.nestedGroups = this._buildGroups(data.actions)
+				// Otherwise, build nested rows for each action in the mapping
+				this._buildRows(mapping.actions)
+					.forEach(subRow => row.addRow(subRow))
 			}
 
-			return data.name
+			return row
 		})
-
-		return ids
 	}
 
-	_buildGroup(opts) {
-		const group = new ItemGroup(opts)
-		this.timeline.addGroup(group)
-		this._groups[opts.id] = group
-		return group
+	_buildRow(id, opts) {
+		if (this._rows[id] != null) {
+			return this._rows[id]
+		}
+
+		const row = this.timeline.addRow(new ContainerRow({
+			...opts,
+			collapse: true,
+		}))
+
+		this._rows[id] = row
+		return row
+	}
+
+	getActionTimelineRow(action) {
+		return this._buildRow(action.id, {label: action.name, order: action.id})
 	}
 
 	// cooldown starts at the beginning of the casttime
 	// (though 99% of CD based abilities have no cast time)
 	// TODO: Should I be tracking pet CDs too? I mean, contagion/radiant are a thing.
 	_onBeginCast(event) {
-		const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+		const action = this.data.getAction(event.ability.guid)
 		if (!action || action.cooldown == null) { return }
 
 		this._currentAction = action
@@ -99,7 +102,7 @@ export default class Cooldowns extends Module {
 	}
 
 	_onCast(event) {
-		const action = getDataBy(ACTIONS, 'id', event.ability.guid)
+		const action = this.data.getAction(event.ability.guid)
 		if (!action || action.cooldown == null) { return }
 
 		const finishingCast = this._currentAction && this._currentAction.id === action.id
@@ -131,33 +134,28 @@ export default class Cooldowns extends Module {
 			cd.current = null
 		}
 
-		const action = getDataBy(ACTIONS, 'id', actionId)
+		const action = this.data.getAction(actionId)
 
 		// If the action is on the GCD, GlobalCooldown will be managing its own group
 		if (!action || action.onGcd) {
 			return false
 		}
 
-		// Ensure we've got a group for this item
-		if (!this._groups[actionId]) {
-			this._buildGroup({
-				id: actionId,
-				content: action.name,
-				order: actionId,
-			})
-		}
+		// Ensure we've got a row for this item
+		const row = this._buildRow(actionId, {label: action.name, order: actionId})
 
 		// Add CD info to the timeline
-		cd.history.forEach(use => {
-			if (!use.shared) {
-				this._groups[actionId].addItem(new Item({
-					type: 'background',
-					start: use.timestamp - this.parser.fight.start_time,
-					length: use.length,
-					content: <img src={action.icon} alt={action.name} />,
+		cd.history
+			.forEach(use => {
+				if (use.shared) { return }
+
+				const start = use.timestamp - this.parser.eventTimeOffset
+				row.addItem(new ActionItem({
+					start,
+					end: start + use.length,
+					action,
 				}))
-			}
-		})
+			})
 
 		return true
 	}
@@ -170,7 +168,7 @@ export default class Cooldowns extends Module {
 	}
 
 	startCooldownGroup(originActionId, cooldownGroup) {
-		const sharedCooldownActions = _.get(COOLDOWN_GROUPS, cooldownGroup, [])
+		const sharedCooldownActions = _.get(this._cooldownGroups, cooldownGroup, [])
 		sharedCooldownActions
 			.map(action => action.id)
 			.filter(id => id !== originActionId)
@@ -179,7 +177,7 @@ export default class Cooldowns extends Module {
 
 	startCooldown(actionId, sharedCooldown = false) {
 		// TODO: handle shared CDs
-		const action = getDataBy(ACTIONS, 'id', actionId)
+		const action = this.data.getAction(actionId)
 		if (!action) { return }
 
 		// Get the current cooldown status, falling back to a new cooldown
@@ -188,8 +186,8 @@ export default class Cooldowns extends Module {
 		// If there's a current object, move it into the history
 		// TODO: handle errors on CD overlap
 		if (cd.current) {
-			const currentFightDuration = this.parser.currentTimestamp - this.parser.fight.start_time
-			if (cd.current.timestamp < this.parser.fight.start_time && cd.current.length > currentFightDuration) {
+			const currentFightDuration = this.parser.currentTimestamp - this.parser.eventTimeOffset
+			if (cd.current.timestamp < this.parser.eventTimeOffset && cd.current.length > currentFightDuration) {
 				// Pre-pull usage, reset the cooldown to prevent overlap on timeline since we don't know exactly when cooldown was used pre-pull
 				this.resetCooldown(actionId)
 			} else {
@@ -234,7 +232,7 @@ export default class Cooldowns extends Module {
 
 	setInvulnTime(actionId) {
 		const cd = this.getCooldown(actionId)
-		let previousEndTimestamp = this.parser.fight.start_time
+		let previousEndTimestamp = this.parser.eventTimeOffset
 		let previousCooldown = {}
 		let isFirst = true
 
@@ -293,7 +291,7 @@ export default class Cooldowns extends Module {
 
 		return cd.history.reduce(
 			(time, status) => time + this.getAdjustedTimeOnCooldown(status, currentTimestamp, extension),
-			cd.current? this.getAdjustedTimeOnCooldown(cd.current, currentTimestamp, extension) : 0
+			cd.current ? this.getAdjustedTimeOnCooldown(cd.current, currentTimestamp, extension) : 0,
 		)
 	}
 

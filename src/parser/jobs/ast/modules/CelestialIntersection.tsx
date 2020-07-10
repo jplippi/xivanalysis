@@ -23,8 +23,8 @@ export default class CelestialIntersection extends Module {
 	private totalHeld = 0
 
 	protected init() {
-		this.addHook('cast', {abilityId: ACTIONS.CELESTIAL_INTERSECTION.id, by: 'player'}, this.onCast)
-		this.addHook('complete', this.onComplete)
+		this.addEventHook('cast', {abilityId: ACTIONS.CELESTIAL_INTERSECTION.id, by: 'player'}, this.onCast)
+		this.addEventHook('complete', this.onComplete)
 	}
 
 	private onCast(event: CastEvent) {
@@ -40,7 +40,7 @@ export default class CelestialIntersection extends Module {
 	}
 
 	onComplete() {
-		const holdDuration = this.uses === 0 ? this.parser.fightDuration : this.totalHeld
+		const holdDuration = this.uses === 0 ? this.parser.currentDuration : this.totalHeld
 		const usesMissed = Math.floor(holdDuration / (ACTIONS.CELESTIAL_INTERSECTION.cooldown * 1000))
 		const fightDuration = this.parser.fight.end_time - this.parser.fight.start_time
 		const maxUses = (fightDuration / (ACTIONS.CELESTIAL_INTERSECTION.cooldown * 1000) ) - 1

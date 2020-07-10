@@ -1,26 +1,16 @@
 import cn from 'classnames'
 import {ActionLink, ItemLink} from 'components/ui/DbLink'
 import {getDataBy} from 'data'
-import ACTIONS from 'data/ACTIONS'
-import {ITEM_ID_OFFSET} from 'data/ACTIONS/ITEMS'
-import {AbilityEvent} from 'fflogs'
-import PropTypes from 'prop-types'
+import ACTIONS, {ITEM_ID_OFFSET} from 'data/ACTIONS'
+import {Ability} from 'fflogs'
 import React, {Component} from 'react'
 import styles from './Rotation.module.css'
 
 interface RotationProps {
-	events: AbilityEvent[]
+	events: Array<{ability: Ability}>
 }
 
 export default class Rotation extends Component<RotationProps> {
-	static propTypes = {
-		events: PropTypes.arrayOf(PropTypes.shape({
-			ability: PropTypes.shape({
-				guid: PropTypes.number.isRequired,
-			}).isRequired,
-		})).isRequired,
-	}
-
 	render() {
 		const {events} = this.props
 

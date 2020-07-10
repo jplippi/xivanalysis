@@ -18,9 +18,9 @@ export default class Tsubame  extends Module {
 
 	constructor(...args) {
 		super(...args)
-		this.addHook('cast', {by: 'player', abilityId: [ACTIONS.KAESHI_HIGANBANA.id, ACTIONS.KAESHI_GOKEN.id]}, this._onBadTsubame,)
-		this.addHook('cast', {by: 'player', abilityId: [ACTIONS.KAESHI_SETSUGEKKA.id]}, this._onDoubleMidare,)
-		this.addHook('complete', this._onComplete,)
+		this.addEventHook('cast', {by: 'player', abilityId: [ACTIONS.KAESHI_HIGANBANA.id, ACTIONS.KAESHI_GOKEN.id]}, this._onBadTsubame)
+		this.addEventHook('cast', {by: 'player', abilityId: [ACTIONS.KAESHI_SETSUGEKKA.id]}, this._onDoubleMidare)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onBadTsubame() {
@@ -52,7 +52,7 @@ export default class Tsubame  extends Module {
 				2: SEVERITY.MAJOR,
 			},
 			why: <Trans id="sam.tsubame.suggestion.badtsubame.why"> You used <ActionLink {...ACTIONS.TSUBAME_GAESHI}/> on the wrong sen skills {badUses} times over the course of the fight </Trans>,
-			value: this._badUses,
+			value: badUses,
 		}))
 
 	}

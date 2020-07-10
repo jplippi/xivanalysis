@@ -11,8 +11,8 @@ import JOBS from 'data/JOBS'
 import STATUSES from 'data/STATUSES'
 import {BuffEvent} from 'fflogs'
 import Module, {dependency} from 'parser/core/Module'
-import {AoeEvent} from 'parser/core/modules/AoE'
 import Combatants from 'parser/core/modules/Combatants'
+import {NormalisedDamageEvent} from 'parser/core/modules/NormalisedEvents'
 import Suggestions, {TieredSuggestion} from 'parser/core/modules/Suggestions'
 
 import {FINISHES, GAUGE_SEVERITY_TIERS, GaugeGraphEntry} from '../CommonData'
@@ -68,20 +68,20 @@ export default class EspritGauge extends Module {
 	private improvisationStart = 0
 
 	protected init() {
-		this.addHook('aoedamage', {by: 'player'}, this.onDamage)
-		this.addHook('cast', {by: 'player', abilityId: ACTIONS.SABER_DANCE.id}, this.onConsumeEsprit)
-		this.addHook('applybuff', {by: 'player', abilityId: STATUSES.IMPROVISATION.id}, this.startImprov)
-		this.addHook('removebuff', {by: 'player', abilityId: STATUSES.IMPROVISATION.id}, this.endImprov)
-		this.addHook('death', {to: 'player'}, this.onDeath)
-		this.addHook('complete', this.onComplete)
+		this.addEventHook('normaliseddamage', {by: 'player'}, this.onDamage)
+		this.addEventHook('cast', {by: 'player', abilityId: ACTIONS.SABER_DANCE.id}, this.onConsumeEsprit)
+		this.addEventHook('applybuff', {by: 'player', abilityId: STATUSES.IMPROVISATION.id}, this.startImprov)
+		this.addEventHook('removebuff', {by: 'player', abilityId: STATUSES.IMPROVISATION.id}, this.endImprov)
+		this.addEventHook('death', {to: 'player'}, this.onDeath)
+		this.addEventHook('complete', this.onComplete)
 	}
 
-	private onDamage(event: AoeEvent) {
-		if (!ESPRIT_GENERATION_MULTIPLIERS[event.ability.guid] || !event.successfulHit) {
+	private onDamage(event: NormalisedDamageEvent) {
+		if (!ESPRIT_GENERATION_MULTIPLIERS[event.ability.guid] || !event.hasSuccessfulHit) {
 			return
 		}
 		let generatedAmt = 0
-		if (this.combatants.selected.hasStatus(STATUSES.TECHNICAL_FINISH.id)) {
+		if (this.combatants.selected.hasStatus({statusId: STATUSES.TECHNICAL_FINISH.id, sourceID: this.combatants.selected.guid})) {
 			generatedAmt += ESPRIT_GENERATION_MULTIPLIERS[event.ability.guid] * ESPRIT_GENERATION_AMOUNT * ESPRIT_RATE_PARTY * (Object.keys(this.combatants.getEntities()).length-1)
 			// Finishes aren't a weaponskill, so they don't generate esprit
 			if (!FINISHES[event.ability.guid]) {
@@ -165,8 +165,8 @@ export default class EspritGauge extends Module {
 				label: 'Esprit',
 				data: this.history,
 				steppedLine: true,
-				backgroundColor: dncColor.fade(0.8),
-				borderColor: dncColor.fade(0.5),
+				backgroundColor: dncColor.fade(0.8).toString(),
+				borderColor: dncColor.fade(0.5).toString(),
 			}],
 		}
 		// tslint:enable:no-magic-numbers

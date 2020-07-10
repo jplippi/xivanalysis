@@ -4,7 +4,7 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 import {Link} from 'react-router-dom'
 
-import Breadcrumbs from './Breadcrumbs'
+import {Breadcrumbs} from './Breadcrumbs'
 import Options from './Options'
 
 import styles from './GlobalSidebar.module.css'
@@ -24,7 +24,7 @@ class GlobalSidebar extends React.Component {
 			{/* Main logo */}
 			<Link to="/" className={classnames(
 				styles.logo,
-				centerLogo && styles.center
+				centerLogo && styles.center,
 			)}>
 				<img
 					src={process.env.PUBLIC_URL + '/logo.png'}

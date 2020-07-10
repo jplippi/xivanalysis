@@ -41,8 +41,8 @@ export default class Kaiten extends Module {
 
 	constructor(...args) {
 		super(...args)
-		this.addHook('cast', {by: 'player'}, this._onCast)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('cast', {by: 'player'}, this._onCast)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onCast(event) {
@@ -87,7 +87,7 @@ export default class Kaiten extends Module {
 					5: SEVERITY.MAJOR,
 				},
 				why: <Trans id = "sam.kaiten.suggestion.missedkaiten.why">
-                                        You failed to Kaiten <Plural value={this._missedKaitenCasts} one="# time" other="# times"/> on either  on <ActionLink {...ACTIONS.MIDARE_SETSUGEKKA}/> and/or <ActionLink {...ACTIONS.HIGANBANA}/>
+                                        You failed to Kaiten <Plural value={this._missedKaitenCasts} one="# time" other="# times"/> on either <ActionLink {...ACTIONS.MIDARE_SETSUGEKKA}/> or <ActionLink {...ACTIONS.HIGANBANA}/>
 				</Trans>,
 				value: this._missedKaitenCasts,
 			}))

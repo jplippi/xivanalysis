@@ -16,6 +16,7 @@ export default class StormsEye extends Module {
 	static dependencies = [
 		'checklist',
 		'combatants',
+		'entityStatuses',
 		'invuln',
 		'suggestions',
 	]
@@ -30,9 +31,9 @@ export default class StormsEye extends Module {
 			by: 'player',
 			abilityId: STATUSES.STORMS_EYE.id,
 		}
-		this.addHook('applybuff', filter, this._onStormsEyeApplication)
-		this.addHook('refreshbuff', filter, this._onStormsEyeApplication)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('applybuff', filter, this._onStormsEyeApplication)
+		this.addEventHook('refreshbuff', filter, this._onStormsEyeApplication)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onStormsEyeApplication(event) {
@@ -80,8 +81,8 @@ export default class StormsEye extends Module {
 
 	//
 	getUptimePercent() {
-		const statusUptime = this.combatants.getStatusUptime(STATUSES.STORMS_EYE.id, this.parser.player.id)
-		const fightUptime = this.parser.fightDuration - this.invuln.getInvulnerableUptime()
+		const statusUptime = this.entityStatuses.getStatusUptime(STATUSES.STORMS_EYE.id, this.combatants.getEntities())
+		const fightUptime = this.parser.currentDuration - this.invuln.getInvulnerableUptime()
 
 		return (statusUptime / fightUptime) * 100
 	}

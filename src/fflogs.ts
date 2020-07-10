@@ -1,3 +1,5 @@
+import {Event} from 'events'
+
 // -----
 // Fight
 // -----
@@ -36,12 +38,13 @@ export enum ActorType {
 	// Enemy
 	BOSS = 'Boss',
 	NPC = 'NPC',
+	UNKNOWN = 'Unknown', // ???
 
 	// Friendly
 	PALADIN = 'Paladin',
 	WARRIOR = 'Warrior',
 	DARK_KNIGHT = 'DarkKnight',
-	GUNBREAKER = 'Gunbreaker', // TODO: CONFIRM
+	GUNBREAKER = 'Gunbreaker',
 	WHITE_MAGE = 'WhiteMage',
 	SCHOLAR = 'Scholar',
 	ASTROLOGIAN = 'Astrologian',
@@ -51,10 +54,11 @@ export enum ActorType {
 	SAMURAI = 'Samurai',
 	BARD = 'Bard',
 	MACHINIST = 'Machinist',
-	DANCER = 'Dancer', // TODO: CONFIRM
+	DANCER = 'Dancer',
 	BLACK_MAGE = 'BlackMage',
 	SUMMONER = 'Summoner',
 	RED_MAGE = 'RedMage',
+	BLUE_MAGE = 'BlueMage',
 	LIMIT_BREAK = 'LimitBreak',
 
 	// Pet
@@ -94,7 +98,7 @@ export interface ActorResources {
 }
 
 // -----
-// Events
+// Event field data
 // -----
 
 export enum AbilityType {
@@ -131,14 +135,14 @@ export interface Ability {
 	type: AbilityType
 }
 
-// Hell if I know. Seems to be used for 'Environment', and that's about it.
+// Used for inlined actors, typically those that are unranked / uncounted
 interface EventActor extends BaseActor {
 	icon: string,
 }
 
-export interface Event {
+/** Fields potentially present on all fflogs events */
+export interface BaseEventFields {
 	timestamp: number
-	type: string | symbol
 
 	source?: EventActor
 	sourceID?: number
@@ -150,11 +154,13 @@ export interface Event {
 	targetIsFriendly: boolean
 }
 
-export interface AbilityEvent extends Event {
+/** Fields present on events caused by, or in relation to an "ability" being executed */
+export interface AbilityEventFields extends BaseEventFields {
 	ability: Ability
 }
 
-interface EffectEvent extends AbilityEvent {
+/** Fields present on events wherein a discrete effect has taken place */
+interface EffectEventFields extends AbilityEventFields {
 	hitType: HitType
 	tick?: boolean
 
@@ -166,6 +172,9 @@ interface EffectEvent extends AbilityEvent {
 	sourceResources?: ActorResources
 	targetResources: ActorResources
 
+	packetID?: number
+	unpaired?: boolean
+
 	simulated?: boolean
 	actorPotencyRatio?: number
 	expectedCritRate?: number
@@ -174,37 +183,92 @@ interface EffectEvent extends AbilityEvent {
 	multiplier?: number
 }
 
-export interface DeathEvent extends Event { type: 'death' }
-export interface CastEvent extends AbilityEvent { type: 'begincast' | 'cast' }
-export interface DamageEvent extends EffectEvent {
-	type: 'damage'
+// -----
+// Events
+// -----
+
+export interface DeathEvent extends BaseEventFields {
+	type: 'death'
+}
+
+const castEventTypes = [
+	'begincast',
+	'cast',
+] as const
+export const isCastEvent = (event: Event): event is CastEvent =>
+	(castEventTypes as readonly any[]).includes(event.type)
+export interface CastEvent extends AbilityEventFields {
+	type: typeof castEventTypes[number]
+}
+
+export interface BuffEvent extends AbilityEventFields {
+	type:
+		| 'applybuff'
+		| 'applydebuff'
+		| 'refreshbuff'
+		| 'refreshdebuff'
+		| 'removebuff'
+		| 'removedebuff'
+}
+
+export interface BuffStackEvent extends AbilityEventFields {
+	type:
+		| 'applybuffstack'
+		| 'applydebuffstack'
+		| 'removebuffstack'
+		| 'removedebuffstack'
+	stack: number
+}
+
+export interface TargetabilityUpdateEvent extends AbilityEventFields {
+	type: 'targetabilityupdate'
+	targetable: 0 | 1
+}
+
+const damageEventTypes = [
+	'calculateddamage',
+	'damage',
+] as const
+export const isDamageEvent = (event: Event): event is DamageEvent =>
+	(damageEventTypes as readonly any[]).includes(event.type)
+export interface DamageEvent extends EffectEventFields {
+	type: typeof damageEventTypes[number]
 	overkill?: number
 	absorbed: number
 	multistrike?: boolean
 	blocked?: number
 }
-export interface HealEvent extends EffectEvent {
-	type: 'heal'
+
+const healEventTypes = [
+	'calculatedheal',
+	'heal',
+] as const
+export const isHealEvent = (event: Event): event is HealEvent =>
+	(healEventTypes as readonly any[]).includes(event.type)
+export interface HealEvent extends EffectEventFields {
+	type: typeof healEventTypes[number]
 	overheal: number
 }
-export interface BuffEvent extends AbilityEvent {
-	type: (
-		'applybuff' |
-		'applydebuff' |
-		'refreshbuff' |
-		'refreshdebuff' |
-		'removebuff' |
-		'removedebuff'
-	)
-}
-export interface BuffStackEvent extends AbilityEvent {
-	type: (
-		'applybuffstack' |
-		'applydebuffstack' |
-		'removebuffstack' |
-		'removedebuffstack'
-	)
-	stack: number
+
+type EffectEvent =
+	| DamageEvent
+	| HealEvent
+
+export type AbilityEvent =
+	| EffectEvent
+	| CastEvent
+	| BuffEvent
+	| BuffStackEvent
+	| TargetabilityUpdateEvent
+
+export type FflogsEvent =
+	| AbilityEvent
+	| DeathEvent
+
+declare module 'events' {
+	interface EventTypeRepository {
+		fflogs: FflogsEvent
+	}
 }
 
 // -----
@@ -243,7 +307,14 @@ interface SharedReportFightsResponse {
 
 interface ProcessingReportFightsResponse extends SharedReportFightsResponse {
 	exportedCharacters: unknown[]
-	processing: true
+	enemies?: undefined
+	enemyPets?: undefined
+	fights?: undefined
+	friendlies?: undefined
+	friendlyPets?: undefined
+	lang?: undefined
+	phases?: undefined
+	processing?: true
 }
 
 export interface ProcessedReportFightsResponse extends SharedReportFightsResponse {
@@ -275,7 +346,14 @@ export interface ReportEventsQuery {
 	translate?: boolean,
 }
 
-export interface ReportEventsResponse {
-	events: Event[]
+interface CorrectReportEventsResponse {
+	events: FflogsEvent[]
 	nextPageTimestamp?: number
 }
+
+// Yes, really.
+type MalformedReportEventsResponse = ''
+
+export type ReportEventsResponse =
+	| CorrectReportEventsResponse
+	| MalformedReportEventsResponse

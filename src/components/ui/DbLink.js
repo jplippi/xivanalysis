@@ -1,8 +1,8 @@
 import {Trans} from '@lingui/react'
 import {Provider as TooltipProvider, tooltipHOC} from '@xivanalysis/tooltips'
-import {ITEM_ID_OFFSET} from 'data/ACTIONS/ITEMS'
+import {ITEM_ID_OFFSET} from 'data/ACTIONS'
 import {STATUS_ID_OFFSET} from 'data/STATUSES'
-import {useObserver} from 'mobx-react-lite'
+import {useObserver} from 'mobx-react'
 import PropTypes from 'prop-types'
 import React from 'react'
 import {Icon, Popup} from 'semantic-ui-react'
@@ -110,6 +110,8 @@ export const ItemLink = props => <Tooltip
 
 StatusLink.propTypes = {
 	id: PropTypes.number.isRequired,
+	showName: PropTypes.bool,
+	iconSize: PropTypes.string,
 }
 
 ItemLink.propTypes = {

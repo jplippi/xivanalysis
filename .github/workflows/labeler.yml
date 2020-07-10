@@ -1,0 +1,14 @@
+name: Labeler
+on:
+  schedule:
+    - cron: '0 * * * *'
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    if: github.repository == 'xivanalysis/xivanalysis'
+    steps:
+      - uses: paulfantom/periodic-labeler@3bafde5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LABEL_MAPPINGS_FILE: .github/labeler.yml

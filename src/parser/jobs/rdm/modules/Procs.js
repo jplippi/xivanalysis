@@ -5,29 +5,54 @@ import {ActionLink, StatusLink} from 'components/ui/DbLink'
 import ACTIONS from 'data/ACTIONS'
 import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
-import {TieredSuggestion} from 'parser/core/modules/Suggestions'
-import {PROCS, SEVERITY_MISSED_PROCS, SEVERITY_OVERWRITTEN_PROCS, SEVERITY_INVULN_PROCS} from 'parser/jobs/rdm/modules/ProcsEnum'
+import {TieredSuggestion, SEVERITY} from 'parser/core/modules/Suggestions'
+import {getDataBy} from 'data'
+import {SimpleRow, StatusItem} from 'parser/core/modules/Timeline'
+
+const SEVERITY_OVERWRITTEN_PROCS = {
+	1: SEVERITY.MINOR,
+	2: SEVERITY.MEDIUM,
+	5: SEVERITY.MAJOR,
+}
+
+const SEVERITY_INVULN_PROCS = {
+	1: SEVERITY.MINOR,
+	2: SEVERITY.MEDIUM,
+	3: SEVERITY.MAJOR,
+}
+
+const SEVERITY_MISSED_PROCS = {
+	1: SEVERITY.MINOR,
+	2: SEVERITY.MEDIUM,
+	7: SEVERITY.MAJOR,
+}
+
+/**
+ * Procs that a RDM gains over a fight caused by the RDM themselves
+ */
+const PROCS = [
+	STATUSES.VERSTONE_READY.id,
+	STATUSES.VERFIRE_READY.id,
+]
+
+const CAST_STATE_MAP = {
+	[STATUSES.VERSTONE_READY.id]: ACTIONS.VERSTONE,
+	[STATUSES.VERFIRE_READY.id]: ACTIONS.VERFIRE,
+}
 
 export default class Procs extends Module {
 	static handle = 'procs'
 	static title = t('rdm.procs.title')`Proc Issues`
 	static dependencies = [
 		'downtime',
+		'enemies',
 		'invuln',
 		'suggestions',
-		'enemies',
+		'timeline',
 	]
 
 	_history = {}
 	_invulnCasts = []
-	_castStateMap = {
-		[STATUSES.VERSTONE_READY.id]: ACTIONS.VERSTONE,
-		[STATUSES.VERFIRE_READY.id]: ACTIONS.VERFIRE,
-	}
-	_doNotCastMap = {
-		[STATUSES.VERSTONE_READY.id]: ACTIONS.VERAERO,
-		[STATUSES.VERFIRE_READY.id]: ACTIONS.VERTHUNDER,
-	}
 	//Global timestamp tracking per Proc
 	_currentProcs = {}
 	_castState = null
@@ -36,29 +61,49 @@ export default class Procs extends Module {
 	_playerWasInDowntime = false
 	_lastTargetID = 0
 
+	_buffWindows = {
+		[STATUSES.VERFIRE_READY.id]: {
+			current: null,
+			history: [],
+		},
+		[STATUSES.VERSTONE_READY.id]: {
+			current: null,
+			history: [],
+		},
+	}
+
+	_row = null
+	_rows = new Map()
+
 	constructor(...args) {
 		super(...args)
 
-		this.addHook('cast', {by: 'player'}, this._onCast)
-		this.addHook('applybuff', {
-			to: 'player',
-			abilityId: PROCS,
-		}, this._onGain)
-		this.addHook('removebuff', {
-			to: 'player',
-			abilityId: PROCS,
-		}, this._onRemove)
-		this.addHook('refreshbuff', {
-			to: 'player',
-			abilityId: PROCS,
-		}, this._onRefresh)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('cast', {by: 'player'}, this._onCast)
+		this.addEventHook('applybuff', {by: 'player', abilityId: PROCS}, this._onGain)
+		this.addEventHook('removebuff', {by: 'player', abilityId: PROCS}, this._onRemove)
+		this.addEventHook('refreshbuff', {by: 'player', abilityId: PROCS}, this._onRefresh)
+		this.addEventHook('complete', this._onComplete)
+		this.addEventHook('death', {to: 'player'}, this._onDeath)
 		this._initializeHistory()
+
+		this._row = this.timeline.addRow(new SimpleRow({
+			label: 'Procs',
+			order: 0,
+		}))
+	}
+
+	getRowForStatus(status) {
+		let row = this._rows.get(status.id)
+		if (row == null) {
+			row = this._row.addRow(new SimpleRow({label: status.name}))
+			this._rows.set(status.id, row)
+		}
+		return row
 	}
 
 	_onCast(event) {
 		const abilityID = event.ability.guid
-		const downtime = this.downtime.getDowntime(this._previousCast||0, event.timestamp)
+		const downtime = this.downtime.getDowntime(this._previousCast || 0, event.timestamp)
 		this._previousCast = event.timestamp
 		this._playerWasInDowntime = downtime > 0
 		this._targetWasInvuln = this.invuln.isInvulnerable(event.targetID, event.timestamp)
@@ -88,6 +133,7 @@ export default class Procs extends Module {
 
 	_onGain(event) {
 		const statusID = event.ability.guid
+		const tracker = this._buffWindows[statusID]
 		// Debug
 		// console.log(`Gain Status: ${STATUSES[statusID].name} Timestamp: ${event.timestamp}`)
 		//Initialize if not present
@@ -104,6 +150,9 @@ export default class Procs extends Module {
 			this._currentProcs[statusID] = 0
 		}
 
+		tracker.current = {
+			start: event.timestamp,
+		}
 		this._currentProcs[statusID] = event.timestamp
 	}
 
@@ -117,6 +166,15 @@ export default class Procs extends Module {
 		}
 
 		this._currentProcs[statusID] = event.timestamp
+
+		if (this._buffWindows[statusID].current) {
+			//Overwritten!
+			this._stopAndSave(statusID, event.timestamp)
+			const tracker = this._buffWindows[statusID]
+			tracker.current = {
+				start: event.timestamp,
+			}
+		}
 	}
 
 	_onRemove(event) {
@@ -146,23 +204,66 @@ export default class Procs extends Module {
 				lastTargetName,
 			}
 			this._invulnCasts.push(invulnEvent)
-		} else if (this._castState !== this._castStateMap[statusID].id && !this._playerWasInDowntime) {
+		} else if (this._castState !== CAST_STATE_MAP[statusID].id && !this._playerWasInDowntime) {
 			this._history[statusID].missed++
 		}
 
-		if (this._castState === this._castStateMap[statusID].id) {
-		//Reset this statusID!
+		if (this._castState === CAST_STATE_MAP[statusID].id) {
+			//Reset this statusID!
 			this._currentProcs[statusID] = 0
 		}
+
+		this._stopAndSave(statusID, event.timestamp)
+	}
+
+	_stopAndSave(statusID, endTime = this.parser.currentTimestamp) {
+		const tracker = this._buffWindows[statusID]
+
+		if (!tracker.current) {
+			return
+		}
+
+		tracker.current.stop = endTime
+		tracker.history.push(tracker.current)
+		tracker.current = null
+	}
+
+	_onDeath(event) {
+		PROCS.forEach(buff => {
+			if (this._buffWindows[buff].current) {
+				this._stopAndSave(buff, event.timestamp)
+			}
+		})
 	}
 
 	_onComplete() {
-		const missedFire = this._history[STATUSES.VERFIRE_READY.id].missed||0
-		const invulnFire = this._history[STATUSES.VERFIRE_READY.id].invuln||0
-		const overWrittenFire = this._history[STATUSES.VERFIRE_READY.id].overWritten||0
-		const missedStone = this._history[STATUSES.VERSTONE_READY.id].missed||0
-		const invulnStone = this._history[STATUSES.VERSTONE_READY.id].invuln||0
-		const overWrittenStone = this._history[STATUSES.VERSTONE_READY.id].overWritten||0
+		const missedFire = this._history[STATUSES.VERFIRE_READY.id].missed || 0
+		const invulnFire = this._history[STATUSES.VERFIRE_READY.id].invuln || 0
+		const overWrittenFire = this._history[STATUSES.VERFIRE_READY.id].overWritten || 0
+		const missedStone = this._history[STATUSES.VERSTONE_READY.id].missed || 0
+		const invulnStone = this._history[STATUSES.VERSTONE_READY.id].invuln || 0
+		const overWrittenStone = this._history[STATUSES.VERSTONE_READY.id].overWritten || 0
+
+		PROCS.forEach(buff => {
+			const status = getDataBy(STATUSES, 'id', buff)
+			const row = this.getRowForStatus(status)
+			const fightStart = this.parser.fight.start_time
+
+			if (this._buffWindows[buff].current) {
+				this._stopAndSave(buff)
+			}
+
+			//add buff windows to the timeline
+			this._buffWindows[buff].history.forEach(window => {
+				if (window) {
+					row.addItem(new StatusItem({
+						status,
+						start: window.start - fightStart,
+						end: window.stop - fightStart,
+					}))
+				}
+			})
+		})
 
 		//Icons always default to the White Mana spell if black/jolt spells don't have more bad items.
 		//TODO I need to figure out a good way of excluding items that evaluated to 0 in the condensed groups.
@@ -171,12 +272,12 @@ export default class Procs extends Module {
 		this.suggestions.add(new TieredSuggestion({
 			icon: missedFire > missedStone ? ACTIONS.VERFIRE.icon : ACTIONS.VERSTONE.icon,
 			content: <Trans id="rdm.procs.suggestions.missed.content">
-					Try to use <ActionLink {...ACTIONS.VERFIRE} /> whenever you have <StatusLink {...STATUSES.VERFIRE_READY} /> or <ActionLink {...ACTIONS.VERSTONE} /> whenever you have <StatusLink {...STATUSES.VERSTONE_READY} /> to avoid losing out on mana gains
+				Try to use <ActionLink {...ACTIONS.VERFIRE} /> whenever you have <StatusLink {...STATUSES.VERFIRE_READY} /> or <ActionLink {...ACTIONS.VERSTONE} /> whenever you have <StatusLink {...STATUSES.VERSTONE_READY} /> to avoid losing out on mana gains
 			</Trans>,
 			tiers: SEVERITY_MISSED_PROCS,
 			value: missedFire + missedStone,
 			why: <Trans id="rdm.procs.suggestions.missed.why">
-					You missed <Plural value={missedFire} one="# Verfire proc" other="# Verfire procs" />, and <Plural value={missedStone} one="# Verstone proc" other="# Verstone procs" />.
+				You missed <Plural value={missedFire} one="# Verfire proc" other="# Verfire procs" />, and <Plural value={missedStone} one="# Verstone proc" other="# Verstone procs" />.
 			</Trans>,
 		}))
 
@@ -195,12 +296,12 @@ export default class Procs extends Module {
 		this.suggestions.add(new TieredSuggestion({
 			icon: invulnFire > invulnStone ? ACTIONS.VERFIRE.icon : ACTIONS.VERSTONE.icon,
 			content: <Trans id="rdm.procs.suggestions.invuln.content">
-					Try not to use <ActionLink {...ACTIONS.VERFIRE}/>, and <ActionLink {...ACTIONS.VERSTONE} /> while the boss is invulnerable
+				Try not to use <ActionLink {...ACTIONS.VERFIRE} />, and <ActionLink {...ACTIONS.VERSTONE} /> while the boss is invulnerable
 			</Trans>,
 			tiers: SEVERITY_INVULN_PROCS,
 			value: invulnFire + invulnStone,
 			why: <Trans id="rdm.procs.suggestions.invuln.why">
-					You used <Plural value={invulnFire} one="# Verfire proc" other="# Verfire procs" />, and <Plural value={invulnStone} one="# Verstone proc" other="# Verstone procs" /> on an invulnerable boss.
+				You used <Plural value={invulnFire} one="# Verfire proc" other="# Verfire procs" />, and <Plural value={invulnStone} one="# Verstone proc" other="# Verstone procs" /> on an invulnerable boss.
 			</Trans>,
 		}))
 	}
@@ -219,7 +320,7 @@ export default class Procs extends Module {
 			<ul>
 				{invulnEvents.map(item => <li key={item.timestamp}>
 					<strong>{this.parser.formatTimestamp(item.timestamp)}</strong>:&nbsp;
-					{this._castStateMap[item.statusID].name}&nbsp;-&nbsp;<strong><Trans id="rdm.procs.invuln.target">Target</Trans></strong>:&nbsp;{item.lastTargetName}
+					{CAST_STATE_MAP[item.statusID].name}&nbsp;-&nbsp;<strong><Trans id="rdm.procs.invuln.target">Target</Trans></strong>:&nbsp;{item.lastTargetName}
 				</li>)}
 			</ul>
 		</Fragment>

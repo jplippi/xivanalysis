@@ -17,6 +17,8 @@ const AETHER_ACTIONS = [
 ]
 
 const MAX_AETHERFLOW = 2
+// 5s cooldown of Fester + 2.5s of GCD slop time in case Fester couldn't be used same GCD as Energy Drain/Siphon
+const MIN_AETHERFLOW_SPEND_LENGTH = 7500
 
 export const DEMIS = [
 	PETS.DEMI_BAHAMUT.id,
@@ -28,7 +30,6 @@ export default class Gauge extends Module {
 	static handle = 'gauge'
 	static dependencies = [
 		'brokenLog',
-		'cooldowns',
 		'pets',
 		'suggestions',
 	]
@@ -37,6 +38,7 @@ export default class Gauge extends Module {
 	// Properties
 	// -----
 	_aetherflow = 0
+	_rushingAetherflow = false
 
 	// Track lost stacks
 	_lostAetherflow = 0
@@ -46,13 +48,13 @@ export default class Gauge extends Module {
 
 	constructor(...args) {
 		super(...args)
-		this.addHook('cast', {by: 'player'}, this._onCast)
-		this.addHook('removebuff', {
+		this.addEventHook('cast', {by: 'player'}, this._onCast)
+		this.addEventHook('removebuff', {
 			by: 'player',
 			abilityId: STATUSES.DREADWYRM_TRANCE.id,
 		}, this._onRemoveDwt)
-		this.addHook('death', {to: 'player'}, this._onDeath)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('death', {to: 'player'}, this._onDeath)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	// -----
@@ -67,17 +69,23 @@ export default class Gauge extends Module {
 		return this._rushing
 	}
 
+	isRushingAetherflow() {
+		return this._rushingAetherflow
+	}
+
 	// -----
 	// Event handling
 	// -----
 	_onCast(event) {
 		const abilityId = event.ability.guid
+		const fightTimeRemaining = this.parser.fight.end_time - event.timestamp
 
 		if (abilityId === ACTIONS.ENERGY_DRAIN.id || abilityId === ACTIONS.ENERGY_SIPHON.id) {
 			// Energy Drain/Siphon restores up to 2 flow stacks
 			// flow can never be > 2, so any remaining on cast is lost
 			this._lostAetherflow += this._aetherflow
 			this._aetherflow = MAX_AETHERFLOW
+			this._rushingAetherflow = MIN_AETHERFLOW_SPEND_LENGTH >= fightTimeRemaining
 		}
 
 		if (AETHER_ACTIONS.includes(abilityId)) {
@@ -93,10 +101,8 @@ export default class Gauge extends Module {
 			}
 		}
 
+		// Check if they're (potentially) rushing DWT -> Demi
 		if (abilityId === ACTIONS.DREADWYRM_TRANCE.id) {
-			// DWT resets 3D
-			this.cooldowns.resetCooldown(ACTIONS.TRI_DISASTER.id)
-			const fightTimeRemaining = this.parser.fight.end_time - event.timestamp
 			this._rushing = (DWT_LENGTH + DEMI_SUMMON_LENGTH) >= fightTimeRemaining
 		}
 	}

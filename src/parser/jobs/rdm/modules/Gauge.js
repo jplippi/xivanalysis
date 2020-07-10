@@ -93,7 +93,7 @@ class GaugeAction {
 		const abilityId = event.ability.guid
 		const {white, black} = MANA_GAIN[abilityId] || {}
 		if (white || black) {
-			if (!event.successfulHit) {
+			if (!event.hasSuccessfulHit) {
 				// Melee combo skills will still consume mana but will not continue the combo, set an invuln/missed flag for downstream consumers
 				this.missOrInvuln = true
 
@@ -183,13 +183,13 @@ export default class Gauge extends Module {
 		constructor(...args) {
 			super(...args)
 
-			this.addHook('cast', {
+			this.addEventHook('cast', {
 				by: 'player',
 				abilityId: ACTIONS.MANAFICATION.id,
 			}, this._gaugeEvent)
-			this.addHook('aoedamage', {by: 'player'}, this._gaugeEvent)
-			this.addHook('death', {to: 'player'}, this._onDeath)
-			this.addHook('complete', this._onComplete)
+			this.addEventHook('normaliseddamage', {by: 'player'}, this._gaugeEvent)
+			this.addEventHook('death', {to: 'player'}, this._onDeath)
+			this.addEventHook('complete', this._onComplete)
 		}
 
 		_pushToGraph() {
@@ -247,7 +247,7 @@ export default class Gauge extends Module {
 			this._blackManaLostToInvulnerable += gaugeAction.mana.black.invulnLoss
 
 			this._whiteManaLostToManafication += gaugeAction.mana.white.manaficationLoss
-			this._blackManaWastedToManafication += gaugeAction.mana.black.manaficationLoss
+			this._blackManaLostToManafication += gaugeAction.mana.black.manaficationLoss
 
 			if (abilityId in MANA_GAIN || abilityId === ACTIONS.MANAFICATION.id) {
 				this._pushToGraph()
@@ -368,14 +368,14 @@ export default class Gauge extends Module {
 				datasets: [{
 					label: 'White Mana',
 					data: this._history.white,
-					backgroundColor: whm.fade(0.5),
-					borderColor: whm.fade(0.2),
+					backgroundColor: whm.fade(0.5).toString(),
+					borderColor: whm.fade(0.2).toString(),
 					steppedLine: true,
 				}, {
 					label: 'Black Mana',
 					data: this._history.black,
-					backgroundColor: blm.fade(0.5),
-					borderColor: blm.fade(0.2),
+					backgroundColor: blm.fade(0.5).toString(),
+					borderColor: blm.fade(0.2).toString(),
 					steppedLine: true,
 				}],
 			}

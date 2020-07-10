@@ -25,11 +25,12 @@ export default new Meta({
 	</>,
 	supportedPatches: {
 		from: '5.0',
-		to: '5.08',
+		to: '5.2',
 	},
 	contributors: [
 		{user: CONTRIBUTORS.YUMIYA, role: ROLES.DEVELOPER},
 		{user: CONTRIBUTORS.RIRIAN, role: ROLES.DEVELOPER},
+		{user: CONTRIBUTORS.YUMIYAFANGIRL, role: ROLES.DEVELOPER},
 	],
 	changelog,
 })

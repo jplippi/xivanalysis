@@ -74,7 +74,12 @@ const CONTRIBUTORS = {
 	MIKEMATRIX: {
 		name: 'MikeMatrix',
 		avatar: require('./avatar/mikematrix.png'),
-		jobs: [JOBS.PALADIN, JOBS.WARRIOR],
+		jobs: [
+			JOBS.GUNBREAKER,
+			JOBS.DARK_KNIGHT,
+			JOBS.WARRIOR,
+			JOBS.PALADIN,
+		],
 	},
 	YUMIYA: {
 		name: 'Yumiya',
@@ -150,7 +155,30 @@ const CONTRIBUTORS = {
 		name: 'qaphla',
 		jobs: [JOBS.PALADIN, JOBS.GUNBREAKER],
 	},
-
+	FALINDRITH: {
+		name: 'Falindrith',
+		avatar: require('./avatar/falindrith.png'),
+		jobs: [JOBS.DRAGOON],
+	},
+	PAIGE_404: {
+		name: 'Paige 404',
+		avatar: require('./avatar/paige_404.png'),
+		jobs: [JOBS.BLUE_MAGE],
+	},
+	RITASHI: {
+		name: 'Ritashi',
+		jobs: [JOBS.SUMMONER],
+	},
+	YUMIYAFANGIRL: {
+		name: 'yumiyafangirl',
+		avatar: require('./avatar/yumiyafangirl.png'),
+		jobs: [JOBS.MACHINIST],
+	},
+	RIETTY: {
+		name: 'Rietty',
+		avatar: require('./avatar/rietty.png'),
+		jobs: [JOBS.DRAGOON],
+	},
 }
 export default CONTRIBUTORS as Record<keyof typeof CONTRIBUTORS, Contributor>
 

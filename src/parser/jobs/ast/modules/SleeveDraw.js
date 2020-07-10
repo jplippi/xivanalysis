@@ -33,8 +33,8 @@ export default class SleeveDraw extends Module {
 			by: 'player',
 			abilityId: [ACTIONS.SLEEVE_DRAW.id],
 		}
-		this.addHook('cast', _filter, this._onCast)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('cast', _filter, this._onCast)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onCast(event) {
@@ -56,7 +56,7 @@ export default class SleeveDraw extends Module {
 	}
 
 	_onComplete() {
-		const holdDuration = this._uses === 0 ? this.parser.fightDuration : this._totalHeld
+		const holdDuration = this._uses === 0 ? this.parser.currentDuration : this._totalHeld
 		const _usesMissed = Math.floor((holdDuration - this._excusedHeld) / (ACTIONS.SLEEVE_DRAW.cooldown * 1000))
 		const maxUses = this._uses + _usesMissed
 

@@ -12,12 +12,12 @@ import {Suggestion, TieredSuggestion, SEVERITY} from 'parser/core/modules/Sugges
 
 import DISPLAY_ORDER from './DISPLAY_ORDER'
 
-const CORRECT_GCDS = [
-	ACTIONS.RUIN_III.id,
-	ACTIONS.OUTBURST.id,
+const INCORRECT_GCDS = [
+	ACTIONS.SMN_RUIN_II.id,
+	ACTIONS.PHYSICK.id,
 ]
 
-const DWT_CAST_TIME_MOD = -2.5
+export const DWT_CAST_TIME_MOD = -2.5
 
 export const DWT_LENGTH = 15000
 
@@ -31,8 +31,6 @@ const BAD_GCD_SEVERITY = {
 export default class DWT extends Module {
 	static handle = 'dwt'
 	static dependencies = [
-		// Ensure AoE runs cleanup before us
-		'aoe', // eslint-disable-line @xivanalysis/no-unused-dependencies
 		'castTime',
 		'gauge',
 		'suggestions',
@@ -51,19 +49,19 @@ export default class DWT extends Module {
 	constructor(...args) {
 		super(...args)
 
-		this.addHook('cast', {by: 'player'}, this._onCast)
+		this.addEventHook('cast', {by: 'player'}, this._onCast)
 
-		this.addHook('aoedamage', {
+		this.addEventHook('normaliseddamage', {
 			by: 'player',
 			abilityId: ACTIONS.DEATHFLARE.id,
 		}, this._onDeathflareDamage)
 
-		this.addHook('death', {to: 'player'}, () => {
+		this.addEventHook('death', {to: 'player'}, () => {
 			if (!this._active) { return }
 			this._dwt.died = true
 		})
 
-		this.addHook('complete', this._onComplete)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	_onCast(event) {
@@ -89,7 +87,7 @@ export default class DWT extends Module {
 	}
 
 	_onDeathflareDamage(event) {
-		this._stopAndSave(event.hits.length, event.timestamp)
+		this._stopAndSave(event.hitCount, event.timestamp)
 	}
 
 	_onApplyDwt(event) {
@@ -99,7 +97,7 @@ export default class DWT extends Module {
 	}
 
 	_onRemoveDwt() {
-		// Only save if there's no DF - the aoedamage will handle DWTs w/ DF (hopefully all of them lmao)
+		// Only save if there's no DF - _onDeathflareDamage will handle DWTs w/ DF (hopefully all of them lmao)
 		if (!this._dwt.casts.some(cast => cast.ability.guid === ACTIONS.DEATHFLARE.id)) {
 			this._stopAndSave(0)
 		}
@@ -117,7 +115,7 @@ export default class DWT extends Module {
 			badGcds += dwt.casts
 				.filter(cast => {
 					const action = getDataBy(ACTIONS, 'id', cast.ability.guid)
-					return action && action.onGcd && !CORRECT_GCDS.includes(action.id)
+					return action && action.onGcd && INCORRECT_GCDS.includes(action.id)
 				})
 				.length
 		})

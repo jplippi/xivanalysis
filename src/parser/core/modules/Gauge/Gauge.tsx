@@ -5,6 +5,7 @@ import Module from 'parser/core/Module'
 import React from 'react'
 import {isDefined} from 'utilities'
 import {AbstractGauge} from './AbstractGauge'
+import {TimerGauge} from './TimerGauge'
 
 export class Gauge extends Module {
 	static handle = 'gauge'
@@ -13,12 +14,19 @@ export class Gauge extends Module {
 	private gauges: AbstractGauge[] = []
 
 	protected init() {
-		this.addHook('death', {to: 'player'}, this.onDeath)
+		this.addEventHook('death', {to: 'player'}, this.onDeath)
 	}
 
 	/** Add & initialise a gauge implementation to be tracked as part of the core gauge handling. */
 	add<T extends AbstractGauge>(gauge: T) {
 		gauge.setParser(this.parser)
+
+		// TODO: Work out how to remove this. Probably also the parser, too.
+		if (gauge instanceof TimerGauge) {
+			gauge.setAddTimestampHook(this.addTimestampHook.bind(this))
+			gauge.setRemoveTimestampHook(this.removeTimestampHook.bind(this))
+		}
+
 		this.gauges.push(gauge)
 		return gauge
 	}

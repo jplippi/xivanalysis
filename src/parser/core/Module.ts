@@ -1,8 +1,12 @@
 import {MessageDescriptor} from '@lingui/core'
-import {Ability, AbilityEvent, Event, Pet} from 'fflogs'
+import Color from 'color'
+import {Ability, AbilityEvent, Pet, FflogsEvent} from 'fflogs'
+import {Event} from 'events'
 import {cloneDeep} from 'lodash'
 import 'reflect-metadata'
+import {EventHook, EventHookCallback, Filter, FilterPartial, TimestampHook, TimestampHookCallback} from './Dispatcher'
 import Parser from './Parser'
+import {ensureArray} from 'utilities'
 
 export enum DISPLAY_ORDER {
 	TOP = 0,
@@ -21,9 +25,15 @@ export function dependency(target: Module, prop: string) {
 	const dependency = Reflect.getMetadata('design:type', target, prop)
 	const constructor = target.constructor as typeof Module
 
+	// DO NOT REMOVE
+	// This totally-redundant line is a workaround for an issue in FF ~73 which causes the
+	// assignment in the conditional below to completely kludge the entire array regardless
+	// of it's contents if this isn't here.
+	const constructorDependencies = constructor.dependencies
+
 	// Make sure we're not modifying every single module
 	if (!constructor.hasOwnProperty('dependencies')) {
-		constructor.dependencies = [...constructor.dependencies]
+		constructor.dependencies = [...constructorDependencies]
 	}
 
 	// If the dep is Object, it's _probably_ from a JS file. Fall back to simple handling
@@ -43,29 +53,34 @@ export function dependency(target: Module, prop: string) {
 	})
 }
 
+/**
+ * DO NOT USE OR YOU WILL BE FIRED
+ * Totally spit in the face of the entire dependency system by forcing it
+ * to execute the decorated module before the module passed as an argument.
+ * If you have to think whether you need this or not, you don't need it.
+ */
+export const executeBeforeDoNotUseOrYouWillBeFired = (target: typeof Module) =>
+	(source: typeof Module) => {
+		target.dependencies.push(source.handle)
+		return source
+	}
+
 export interface MappedDependency {
 	handle: string
 	prop: string
 }
 
-type FilterPartial<T> = {
-	[K in keyof T]?: T[K] extends object
-		? FilterPartial<T[K]>
-		: FilterPartial<T[K]> | Array<FilterPartial<T[K]>>
-}
-type Filter<T extends Event> = FilterPartial<T> & FilterPartial<{
+type ModuleFilter<T extends Event> = Filter<T> & FilterPartial<{
 	abilityId: Ability['guid'],
-	to: 'player' | 'pet' | T['targetID'],
-	by: 'player' | 'pet' | T['sourceID'],
+	to: 'player' | 'pet' | FflogsEvent['targetID'],
+	by: 'player' | 'pet' | FflogsEvent['sourceID'],
 }>
 
-type HookCallback<T extends Event> = (event: T) => void
-
-export interface Hook<T extends Event> {
-	events: Array<T['type']>
-	filter: Filter<T>
-	callback: HookCallback<T>
+type LogParams = Parameters<typeof console.log>
+interface DebugFnOpts {
+	log: (...messages: LogParams) => void
 }
+type DebugFn = (opts: DebugFnOpts) => void
 
 export default class Module {
 	static dependencies: Array<string | MappedDependency> = []
@@ -73,6 +88,7 @@ export default class Module {
 	static displayMode: DISPLAY_MODE
 	// TODO: Refactor this var
 	static i18n_id?: string // tslint:disable-line
+	static debug: boolean = false
 
 	private static _handle: string
 	static get handle() {
@@ -98,8 +114,16 @@ export default class Module {
 		this._title = value
 	}
 
-	// Bite me.
-	private _hooks = new Map<Event['type'], Set<Hook<any>>>()
+	private _debugHeaderColor?: Color
+	private get debugHeaderColor() {
+		if (!this._debugHeaderColor) {
+			const handle = (this.constructor as typeof Module).handle
+			const seed = handle.split('').reduce((acc, cur) => acc + cur.charCodeAt(0), 0)
+			// tslint:disable-next-line:no-magic-numbers
+			this._debugHeaderColor = Color.hsl(seed % 255, 255, 65)
+		}
+		return this._debugHeaderColor
+	}
 
 	constructor(
 		protected readonly parser: Parser,
@@ -128,7 +152,7 @@ export default class Module {
 	// So TS peeps don't need to pass the parser down
 	protected init() {}
 
-	normalise(events: Event[]) {
+	normalise(events: Event[]): Event[] | Promise<Event[]> {
 		return events
 	}
 
@@ -145,33 +169,42 @@ export default class Module {
 		return
 	}
 
-	protected addHook<T extends Event>(
-		events: T['type'] | Array<T['type']>,
-		cb: HookCallback<T>,
-	): Hook<T>
-	protected addHook<T extends Event>(
-		events: T['type'] | Array<T['type']>,
-		filter: Filter<T>,
-		cb: HookCallback<T>,
-	): Hook<T>
-	protected addHook<T extends Event>(
-		events: T['type'] | Array<T['type']>,
-		filterArg: Filter<T> | HookCallback<T>,
-		cbArg?: HookCallback<T>,
-	): Hook<T> | undefined {
+	/**
+	 * Deprecated pass-through for `addEventHook`, maintained for backwards compatibility.
+	 * @deprecated
+	 */
+	// tslint:disable-next-line:member-ordering
+	protected readonly addHook = this.addEventHook
+
+	protected addEventHook<T extends Event>(
+		events: T['type'] | ReadonlyArray<T['type']>,
+		cb: EventHookCallback<T>,
+	): Array<EventHook<T>>
+	protected addEventHook<T extends Event>(
+		events: T['type'] | ReadonlyArray<T['type']>,
+		filter: ModuleFilter<T>,
+		cb: EventHookCallback<T>,
+	): Array<EventHook<T>>
+	protected addEventHook<T extends Event>(
+		events: T['type'] | ReadonlyArray<T['type']>,
+		filterArg: ModuleFilter<T> | EventHookCallback<T>,
+		cbArg?: EventHookCallback<T>,
+	): Array<EventHook<T>> {
 		// I'm currently handling hooks at the module level
 		// Should performance become a concern, this can be moved up to the Parser without breaking the API
 		const cb = typeof filterArg === 'function'? filterArg : cbArg
-		let filter: Filter<T> = typeof filterArg === 'function'? {} : filterArg
+		let filter: ModuleFilter<T> = typeof filterArg === 'function'? {} : filterArg
 
 		// If there's no callback just... stop
-		if (!cb) { return }
+		if (!cb) { return [] }
+
+		const eventTypes = ensureArray(events)
 
 		// QoL filter transforms
 		filter = this.mapFilterEntity(filter, 'to', 'targetID')
 		filter = this.mapFilterEntity(filter, 'by', 'sourceID')
 		if (filter.abilityId !== undefined) {
-			const abilityFilter = filter as Filter<AbilityEvent>
+			const abilityFilter = filter as ModuleFilter<AbilityEvent>
 			if (!abilityFilter.ability) {
 				abilityFilter.ability = {}
 			}
@@ -179,47 +212,43 @@ export default class Module {
 			delete abilityFilter.abilityId
 		}
 
-		// Make sure events is an array
-		if (!Array.isArray(events)) {
-			events = [events]
+		// Fflogs actor IDs are numbers, generic report structure actor IDs
+		// are strings. While we're trying to deal with both, normalise
+		// filter actor IDs to numbers to patch over the difference.
+		// TODO: REMOVE
+		const fixTypeDiscrepancy = (base: any): any =>
+			ensureArray(base).map(val => parseInt(val, 10))
+		if (filter.sourceID != null) {
+			filter.sourceID = fixTypeDiscrepancy(filter.sourceID)
+		}
+		if (filter.targetID != null) {
+			filter.targetID = fixTypeDiscrepancy(filter.targetID)
 		}
 
-		// Final hook representation
-		const hook = {
-			events,
+		const hooks = eventTypes.map(event => ({
+			event,
 			filter,
+			module: (this.constructor as typeof Module).handle,
 			callback: cb.bind(this),
-		}
+		}))
 
-		// Hook for each of the events
-		events.forEach(event => {
-			let hooks = this._hooks.get(event)
+		hooks.forEach(hook => this.parser.dispatcher.addEventHook(hook))
 
-			// Make sure the map has a key for us
-			if (!hooks) {
-				hooks = new Set()
-				this._hooks.set(event, hooks)
-			}
-
-			// Set the hook
-			hooks.add(hook as any)
-		})
-
-		// Return the hook representation so it can be removed (later)
-		return hook
+		return hooks
 	}
 
+	// We don't talk about the type casts here
 	private mapFilterEntity<T extends Event>(
-		filterArg: Filter<T>,
-		qol: keyof Filter<T>,
-		raw: keyof T,
-	) {
+		filterArg: ModuleFilter<T>,
+		qol: keyof ModuleFilter<T>,
+		raw: keyof FflogsEvent,
+	): ModuleFilter<T> {
 		if (!filterArg[qol]) { return filterArg }
 
-		const filter = cloneDeep(filterArg)
+		const filter = cloneDeep(filterArg) as Filter<FflogsEvent>
 
 		// Sorry not sorry for the `any`s. Ceebs working out this filter _again_.
-		switch (filter[qol]) {
+		switch (filterArg[qol]) {
 			case 'player':
 				filter[raw] = this.parser.player.id as any
 				break
@@ -227,72 +256,69 @@ export default class Module {
 				filter[raw] = this.parser.player.pets.map((pet: Pet) => pet.id) as any
 				break
 			default:
-				filter[raw] = filter[qol] as any
+				filter[raw] = filterArg[qol] as any
 		}
 
-		delete filter[qol]
+		delete filter[qol as keyof typeof filter]
 
-		return filter
+		return filter as ModuleFilter<T>
 	}
 
-	// TODO: Test
-	protected removeHook(hook: Hook<any>) {
-		hook.events.forEach(event => {
-			const hooks = this._hooks.get(event)
-			if (!hooks) { return }
-			hooks.delete(hook)
-		})
+	/**
+	 * Deprecated pass-through for `removeEventHook`, maintained for backwards compatibility.
+	 * @deprecated
+	 */
+	// tslint:disable-next-line:member-ordering
+	protected readonly removeHook = this.removeEventHook
+
+	/** Remove a previously added event hook. */
+	protected removeEventHook(hooks: Array<EventHook<any>>) {
+		hooks.forEach(hook => this.parser.dispatcher.removeEventHook(hook))
 	}
 
-	triggerEvent(event: Event) {
-		// Run through registered hooks. Avoid calling 'all' on symbols, they're internal stuff.
-		if (typeof event.type !== 'symbol') {
-			this._runHooks(event, this._hooks.get('all'))
+	/** Add a hook for a timestamp. The provided callback will be fired a single time when the parser reaches the specified timestamp. */
+	protected addTimestampHook(timestamp: number, cb: TimestampHookCallback) {
+		const hook = {
+			timestamp,
+			module: (this.constructor as typeof Module).handle,
+			callback: cb.bind(this),
 		}
-		this._runHooks(event, this._hooks.get(event.type))
+		this.parser.dispatcher.addTimestampHook(hook)
+		return hook
 	}
 
-	private _runHooks(event: Event, hooks?: Set<Hook<Event>>) {
-		if (!hooks) { return }
-		hooks.forEach(hook => {
-			// Check the filter
-			if (!this._filterMatches(event, hook.filter)) {
-				return
-			}
-
-			hook.callback(event)
-		})
+	/** Remove a previously added timestamp hook */
+	protected removeTimestampHook(hook: TimestampHook) {
+		this.parser.dispatcher.removeTimestampHook(hook)
 	}
 
-	private _filterMatches<T extends object, F extends FilterPartial<T>>(event: T, filter: F) {
-		const match = Object.keys(filter).every(key => {
-			// If the event doesn't have the key we're looking for, just shortcut out
-			if (!event.hasOwnProperty(key)) {
-				return false
-			}
+	/**
+	 * Log a debug console message. Will only be printed if built in a non-production
+	 * environment, with `static debug = true` in the module it's being executed in.
+	 */
+	protected debug(debugFn: DebugFn): void
+	protected debug(...messages: LogParams): void
+	protected debug(...messages: [DebugFn] | LogParams) {
+		const module = this.constructor as typeof Module
 
-			// Just trust me 'aite
-			const filterVal: any = filter[key as keyof typeof filter]
-			const eventVal: any = event[key as keyof typeof event]
+		if (!module.debug || process.env.NODE_ENV === 'production') {
+			return
+		}
 
-			// FFLogs doesn't use arrays inside events themselves, so I'm using them to handle multiple possible values
-			if (Array.isArray(filterVal)) {
-				return filterVal.includes(eventVal)
-			}
+		typeof messages[0] === 'function'
+			? messages[0]({log: this.debugLog})
+			: this.debugLog(...messages)
+	}
 
-			// If it's an object, I need to dig down. Mostly for the `ability` key
-			if (typeof filterVal === 'object') {
-				return this._filterMatches(
-					eventVal,
-					filterVal,
-				)
-			}
-
-			// Basic value check
-			return filterVal === eventVal
-		})
-
-		return match
+	private debugLog = (...messages: LogParams) => {
+		const module = this.constructor as typeof Module
+		// tslint:disable-next-line:no-console
+		console.log(
+			`[%c${module.handle}%c]`,
+			`color: ${this.debugHeaderColor}`,
+			'color: inherit',
+			...messages,
+		)
 	}
 
 	output(): React.ReactNode {

@@ -1,5 +1,3 @@
-import {getDataBy} from 'data'
-import STATUSES from 'data/STATUSES'
 import Module from 'parser/core/Module'
 
 // Absurdly large fallback number, so missing duration properties will result in both a console warning and stupid suggestions
@@ -8,7 +6,9 @@ const DEFAULT_DURATION_MILLIS = 120000
 export default class DoTs extends Module {
 	static handle = 'dots'
 	static dependencies = [
+		'data',
 		'enemies',
+		'entityStatuses',
 		'invuln',
 	]
 
@@ -23,7 +23,7 @@ export default class DoTs extends Module {
 		super(...args)
 		// NOTE: All statuses submodules track should include a duration property, otherwise the results this produces will be very fucky
 		this.constructor.statusesToTrack.forEach(statusId => {
-			const status = getDataBy(STATUSES, 'id', statusId)
+			const status = this.data.getStatus(statusId)
 			if (!status) { return }
 			if (!status.hasOwnProperty('duration')) {
 				console.warn(`statusId ${statusId} is missing a duration property`)
@@ -32,8 +32,8 @@ export default class DoTs extends Module {
 				this._statusDuration[statusId] = status.duration * 1000
 			}
 		})
-		this.addHook(['applydebuff', 'refreshdebuff'], {by: 'player', abilityId: this.constructor.statusesToTrack}, this._onDotApply)
-		this.addHook('complete', this._onComplete)
+		this.addEventHook(['applydebuff', 'refreshdebuff'], {by: 'player', abilityId: this.constructor.statusesToTrack}, this._onDotApply)
+		this.addEventHook('complete', this._onComplete)
 	}
 
 	// *** FUNCTIONS TO OVERRIDE *** //
@@ -93,16 +93,16 @@ export default class DoTs extends Module {
 
 	// These two functions are helpers for submodules and should be used but not overridden
 	getUptimePercent(statusId) {
-		const statusUptime = this.enemies.getStatusUptime(statusId)
-		const fightDuration = this.parser.fightDuration - this.invuln.getInvulnerableUptime()
+		const statusUptime = this.entityStatuses.getStatusUptime(statusId, this.enemies.getEntities())
+		const fightDuration = this.parser.currentDuration - this.invuln.getInvulnerableUptime()
 		return (statusUptime / fightDuration) * 100
 	}
 
 	getClippingAmount(statusId) {
 		// This normalises clipping as seconds clipped per minute, since some level of clipping is expected and we need tiers that work for both long and short fights
-		const fightDurationMillis = (this.parser.fightDuration - this.invuln.getInvulnerableUptime())
+		const fightDurationMillis = (this.parser.currentDuration - this.invuln.getInvulnerableUptime())
 		// eslint-disable-next-line no-magic-numbers
-		const clipSecsPerMin = Math.round((this._clip[statusId] * 60) / fightDurationMillis)
+		const clipSecsPerMin = Math.round(((this._clip[statusId] ?? 0) * 60) / fightDurationMillis)
 		return clipSecsPerMin
 	}
 }
