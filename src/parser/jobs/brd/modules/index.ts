@@ -1,5 +1,6 @@
 import {ActionTimeline} from './ActionTimeline'
 import {AlwaysBeCasting} from './AlwaysBeCasting'
+import {ArmysPaeon} from './ArmysPaeon'
 import {ArmysMuse} from './BuffWindows/ArmysMuse'
 import {BattleVoice} from './BuffWindows/BattleVoice'
 import {BurstWindow} from './BuffWindows/BurstWindow'
@@ -32,4 +33,5 @@ export default [
 	BattleVoice,
 	RadiantFinale,
 	ArmysMuse,
+	ArmysPaeon,
 ]
